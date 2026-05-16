@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!--
+  Twitch Relay Page
+  ================
+  このファイルを任意の静的ホスティングサービス（GitHub Pages 等）に配置し、
+  拡張機能の「relay URL」フィールドにそのURLを入力することで
+  moz-extension:// の parent 制約を回避できます。
+
+  配置例:
+    https://your-account.github.io/twitch-relay/relay.html
+    → 拡張機能の relay URL に上記URLを設定
+    → parent ドメインは自動的に "your-account.github.io" が使用される
+
+  通信プロトコル (postMessage):
+    親 → relay:  { type: 'seek',           data: { time: number } }
+    親 → relay:  { type: 'getCurrentTime' }
+    親 → relay:  { type: 'play' }
+    親 → relay:  { type: 'pause' }
+    relay → 親:  { type: 'twitchReady' }
+    relay → 親:  { type: 'currentTime',    data: { time: number } }
+-->
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Twitch Relay</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+    #player, #player > iframe { width: 100% !important; height: 100% !important; border: none; display: block; }
+    #error {
+      display: none; position: absolute; inset: 0;
+      align-items: center; justify-content: center;
+      color: #f87171; font-family: system-ui, sans-serif; font-size: 14px;
+      background: #0f0f13; text-align: center; padding: 16px;
+    }
+    #error.show { display: flex; }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <div id="error"></div>
+
+  <script src="https://player.twitch.tv/js/embed/v1.js"></script>
+  <script>
+    const params  = new URLSearchParams(location.search);
+    const channel = params.get('channel');
+    const video   = params.get('video');
+    // このページ自身のホスト名を parent として使用する（外部から上書き可）
+    const parent  = params.get('parent') || location.hostname || 'localhost';
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    if (!channel && !video) {
+      showError('URL パラメータ "channel" または "video" が必要です');
+    } else if (typeof Twitch === 'undefined') {
+      showError('Twitch Embed スクリプトのロードに失敗しました');
+    } else {
+      const options = {
+        width:    '100%',
+        height:   '100%',
+        autoplay: false,
+        parent:   [parent],
+      };
+      if (channel) options.channel = channel;
+      else         options.video   = String(video).replace(/^v/, '');
+
+      const player = new Twitch.Player('player', options);
+
+      player.addEventListener(Twitch.Player.READY, () => {
+        // ダッシュボードに準備完了を通知
+        window.parent.postMessage({ type: 'twitchReady' }, '*');
+      });
+
+      // ダッシュボードからの制御コマンドを受け取る
+      window.addEventListener('message', (e) => {
+        const { type, data } = e.data || {};
+        switch (type) {
+          case 'seek':
+            player.seek(Math.max(0, data?.time ?? 0));
+            break;
+          case 'getCurrentTime':
+            e.source?.postMessage(
+              { type: 'currentTime', data: { time: player.getCurrentTime() } },
+              e.origin || '*'
+            );
+            break;
+          case 'play':
+            player.play();
+            break;
+          case 'pause':
+            player.pause();
+            break;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

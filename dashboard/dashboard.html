@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MultiStream Sync</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <h1 class="app-title">MultiStream Sync</h1>
+    <div class="topbar-controls">
+      <button id="btn-layout" class="btn btn--secondary">↕ 縦並び</button>
+      <button id="btn-sync" class="btn btn--primary">⏱ 時間を同期</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+
+    <!-- YouTube パネル -->
+    <section class="panel" id="panel-yt" aria-label="YouTube プレイヤー">
+      <div class="panel-config">
+        <div class="config-row">
+          <span class="platform-badge platform-badge--yt">YouTube</span>
+          <input type="text" id="yt-url" class="input input--url"
+                 placeholder="動画URL または 動画ID" autocomplete="off">
+          <button id="btn-yt-load" class="btn btn--load">読込</button>
+        </div>
+        <div class="config-row">
+          <label class="config-label" for="yt-start">配信開始時刻</label>
+          <input type="text" id="yt-start" class="input input--time"
+                 placeholder="HH:MM:SS" inputmode="numeric">
+          <span class="hint">例: 20:30:00</span>
+        </div>
+        <div class="config-row">
+          <label class="config-label" for="yt-api-key">API Key</label>
+          <input type="password" id="yt-api-key" class="input input--apikey"
+                 placeholder="YouTube Data API v3 キー" autocomplete="off">
+          <button id="btn-yt-chat" class="btn btn--chat" disabled>チャット開始</button>
+        </div>
+      </div>
+      <div class="player-wrap" id="yt-wrap">
+        <div id="yt-player" class="player-target"></div>
+        <canvas class="comment-layer" id="yt-canvas" aria-hidden="true"></canvas>
+      </div>
+    </section>
+
+    <div class="divider" aria-hidden="true"></div>
+
+    <!-- Twitch パネル -->
+    <section class="panel" id="panel-tw" aria-label="Twitch プレイヤー">
+      <div class="panel-config">
+        <div class="config-row">
+          <span class="platform-badge platform-badge--tw">Twitch</span>
+          <input type="text" id="tw-url" class="input input--url"
+                 placeholder="チャンネル名 または VOD URL" autocomplete="off">
+          <button id="btn-tw-load" class="btn btn--load">読込</button>
+        </div>
+        <div class="config-row">
+          <label class="config-label" for="tw-start">配信開始時刻</label>
+          <input type="text" id="tw-start" class="input input--time"
+                 placeholder="HH:MM:SS" inputmode="numeric">
+          <span class="hint">例: 20:32:00</span>
+        </div>
+        <div class="config-row">
+          <button id="btn-tw-chat" class="btn btn--chat" disabled>チャット開始</button>
+          <span class="hint">匿名接続 · API Key 不要</span>
+        </div>
+        <details class="config-details">
+          <summary class="config-summary">▶ Twitch 詳細設定（parent / relay）</summary>
+          <div class="config-row config-row--detail">
+            <label class="config-label" for="tw-parent">parent ドメイン</label>
+            <input type="text" id="tw-parent" class="input input--sm"
+                   placeholder="localhost" autocomplete="off">
+            <label class="config-label" for="tw-relay">relay URL</label>
+            <input type="text" id="tw-relay" class="input input--url"
+                   placeholder="https://example.com/relay.html（省略 = SDK 直接）"
+                   autocomplete="off">
+          </div>
+          <p class="config-note">
+            SDK 直接モードは <code>parent</code> ドメインと埋め込みページのホスト名が一致する必要があります。
+            <code>relay.html</code>（同梱）を自前ドメインにホスティングし relay URL を設定すると
+            <code>moz-extension://</code> の制約を回避できます。
+          </p>
+        </details>
+      </div>
+      <div class="player-wrap" id="tw-wrap">
+        <div id="tw-player" class="player-target"></div>
+        <canvas class="comment-layer" id="tw-canvas" aria-hidden="true"></canvas>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="statusbar">
+    <span id="status-msg">プレイヤーを読み込んでください</span>
+  </footer>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

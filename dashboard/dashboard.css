@@ -1,0 +1,241 @@
+/* ===== Reset ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ===== Base ===== */
+html { height: 100%; }
+
+body {
+  height: 100vh;
+  height: 100dvh; /* Android Chrome/Firefox でアドレスバー分を除いた高さ */
+  display: flex;
+  flex-direction: column;
+  background: #0f0f13;
+  color: #e0e0e0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+/* ===== Top Bar ===== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  height: 48px;
+  background: #1a1a24;
+  border-bottom: 1px solid #2a2a3a;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.app-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #a78bfa;
+  white-space: nowrap;
+}
+
+.topbar-controls {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, opacity 0.12s;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn--primary { background: #7c3aed; color: #fff; }
+.btn--primary:hover:not(:disabled) { background: #6d28d9; }
+
+.btn--secondary { background: #2a2a3a; color: #c4b5fd; border: 1px solid #3a3a5a; }
+.btn--secondary:hover:not(:disabled) { background: #3a3a5a; }
+
+.btn--load { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb; padding: 5px 12px; }
+.btn--load:hover:not(:disabled) { background: #2563eb; color: #fff; }
+
+.btn--chat { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; padding: 5px 12px; }
+.btn--chat:hover:not(:disabled) { background: #059669; color: #fff; }
+.btn--chat.is-live { background: #7f1d1d; color: #fca5a5; border-color: #dc2626; }
+.btn--chat.is-live:hover:not(:disabled) { background: #dc2626; color: #fff; }
+
+.input--apikey { flex: 1; min-width: 120px; }
+.input--sm     { width: 110px; }
+
+/* 詳細設定 disclosure */
+.config-details { border-top: 1px solid #2a2a3a; margin-top: 4px; padding-top: 4px; }
+.config-summary {
+  font-size: 11px; color: #6b7280;
+  cursor: pointer; padding: 2px 0;
+  user-select: none; list-style: none;
+}
+.config-summary:hover { color: #9ca3af; }
+.config-row--detail { margin-top: 5px; }
+.config-note {
+  font-size: 11px; color: #6b7280;
+  margin-top: 5px; line-height: 1.6;
+}
+.config-note code {
+  background: #1a1a2a; border: 1px solid #3a3a5a;
+  border-radius: 3px; padding: 1px 5px; font-size: 11px;
+}
+
+/* ===== Stage (main area) ===== */
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: row; /* デフォルト: 横並び */
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 縦並びクラスをJSで付け外しする */
+.stage.layout-vertical { flex-direction: column; }
+
+/* ===== Divider ===== */
+.divider {
+  width: 4px;
+  background: #2a2a3a;
+  flex-shrink: 0;
+}
+.stage.layout-vertical .divider {
+  width: 100%;
+  height: 4px;
+}
+
+/* ===== Panel ===== */
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ===== Config Strip ===== */
+.panel-config {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 12px;
+  background: #14141e;
+  border-bottom: 1px solid #2a2a3a;
+  flex-shrink: 0;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.platform-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.platform-badge--yt { background: #cc0000; color: #fff; }
+.platform-badge--tw { background: #6441a5; color: #fff; }
+
+.input {
+  background: #1a1a2a;
+  border: 1px solid #3a3a5a;
+  border-radius: 5px;
+  color: #e0e0e0;
+  padding: 5px 10px;
+  font-size: 13px;
+  transition: border-color 0.12s;
+}
+.input:focus { outline: none; border-color: #7c3aed; }
+.input.invalid { border-color: #ef4444; }
+
+.input--url { flex: 1; min-width: 100px; }
+.input--time { width: 100px; }
+
+.config-label { font-size: 12px; color: #9ca3af; white-space: nowrap; }
+.hint { font-size: 11px; color: #6b7280; }
+
+/* ===== Player Area ===== */
+.player-wrap {
+  flex: 1;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.player-target {
+  width: 100%;
+  height: 100%;
+}
+
+/* YouTube / Twitch API が注入する iframe をコンテナ全面に広げる */
+.player-target iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: none;
+  display: block;
+}
+
+/* コメントオーバーレイ（クリック/タッチはプレイヤーに透過） */
+.comment-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ===== Status Bar ===== */
+.statusbar {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: #10101a;
+  border-top: 1px solid #2a2a3a;
+  font-size: 12px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+/* ===== Responsive: モバイル (Android Firefox 等) ===== */
+@media (max-width: 640px) {
+  .topbar {
+    height: auto;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+  }
+
+  /* モバイルでは縦積みを強制 */
+  .stage { flex-direction: column !important; }
+  .divider { width: 100% !important; height: 4px !important; }
+
+  .panel-config { padding: 6px 10px; gap: 4px; }
+
+  /* タッチ操作向けに入力サイズを拡大（iOS の自動ズーム防止も兼ねる） */
+  .input { font-size: 16px; padding: 7px 10px; }
+  .input--time { width: 110px; }
+
+  .btn { padding: 8px 12px; }
+
+  .hint { display: none; }
+}
