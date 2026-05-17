@@ -160,6 +160,27 @@ body {
 .plat-btn--yt.active { background: #cc0000; color: #fff; }
 .plat-btn--tw.active { background: #6441a5; color: #fff; }
 
+/* ===== Drag Handle ===== */
+.btn--drag-handle {
+  background: transparent;
+  border: none;
+  color: #3a3a5a;
+  cursor: grab;
+  font-size: 16px;
+  padding: 2px 5px;
+  line-height: 1;
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: color 0.1s, background 0.1s;
+  user-select: none;
+  touch-action: none;
+}
+.btn--drag-handle:hover { color: #6b7280; background: #1a1a2a; }
+.btn--drag-handle:active { cursor: grabbing; }
+
+.panel.is-dragging  { opacity: 0.45; }
+.panel.is-drag-over { outline: 2px solid #7c3aed; outline-offset: -2px; }
+
 /* ===== Collapse Button ===== */
 .btn--collapse {
   background: transparent;

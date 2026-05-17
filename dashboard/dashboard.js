@@ -36,6 +36,24 @@ const LAYOUT_OPTIONS = {
 
 let currentLayout = 'lp2-h';
 
+// ===== パネル表示順 =====
+
+let visualOrder  = [];   // visualOrder[i] = CSS order value for panel i
+let dragPanelIdx = null; // ドラッグ中のパネルインデックス
+
+function applyVisualOrder() {
+  for (let i = 0; i < panels.length; i++) {
+    const el = document.getElementById(`panel-${i}`);
+    if (el) el.style.order = visualOrder[i] ?? i;
+  }
+}
+
+function swapPanelVisualOrder(idxA, idxB) {
+  [visualOrder[idxA], visualOrder[idxB]] = [visualOrder[idxB], visualOrder[idxA]];
+  applyVisualOrder();
+  saveSettings({ visualOrder: visualOrder.slice() });
+}
+
 // ===== パネル HTML テンプレート =====
 
 function createPanelHTML(idx) {
@@ -43,6 +61,7 @@ function createPanelHTML(idx) {
     <section class="panel" id="panel-${idx}" aria-label="プレイヤー ${idx + 1}">
       <div class="panel-config" id="panel-config-${idx}">
         <div class="config-row">
+          <button class="btn--drag-handle" title="ドラッグして並び替え">⠿</button>
           <div class="platform-switch" data-panel="${idx}">
             <button class="plat-btn plat-btn--yt active" data-platform="youtube">YouTube</button>
             <button class="plat-btn plat-btn--tw"        data-platform="twitch">Twitch</button>
@@ -253,10 +272,16 @@ function addPanel() {
   p.setPlatform(defaultPlat);
 
   bindPanelEvents(idx);
+
+  // 新パネルを視覚的に末尾に配置
+  const maxOrd = visualOrder.length > 0 ? Math.max(...visualOrder) : -1;
+  visualOrder.push(maxOrd + 1);
+  applyVisualOrder();
+
   refreshLayoutSelector();
   refreshSyncRefSelector();
   applyLayout(bestLayoutForCount(panels.length));
-  saveSettings({ panelCount: panels.length });
+  saveSettings({ panelCount: panels.length, visualOrder: visualOrder.slice() });
 }
 
 function removePanel() {
@@ -264,6 +289,9 @@ function removePanel() {
   const idx = panels.length - 1;
   panels.pop().destroy();
   document.getElementById(`panel-${idx}`)?.remove();
+
+  visualOrder.splice(idx, 1);
+  applyVisualOrder();
 
   if (syncRefIdx >= panels.length) {
     syncRefIdx = panels.length - 1;
@@ -273,7 +301,7 @@ function removePanel() {
   refreshLayoutSelector();
   refreshSyncRefSelector();
   applyLayout(bestLayoutForCount(panels.length));
-  saveSettings({ panelCount: panels.length });
+  saveSettings({ panelCount: panels.length, visualOrder: visualOrder.slice() });
 }
 
 // 枚数変更時にレイアウトが無効になった場合の既定値
@@ -393,6 +421,9 @@ function bindPanelEvents(idx) {
     btn.title = collapsed ? 'ツールバーを展開' : 'ツールバーを折りたたむ';
   });
 
+  // ドラッグ並び替え
+  setupPanelDrag(idx);
+
   // チャットボタン
   document.getElementById(`btn-chat-${idx}`).addEventListener('click', () => {
     const panel = panels[idx];
@@ -406,6 +437,57 @@ function bindPanelEvents(idx) {
       if (chat.isConnected()) { chat.disconnect(); return; }
       if (!panel.loadedId)   { setStatus('先に Twitch チャンネルを読み込んでください', 'error'); return; }
       chat.connect(panel.loadedId);
+    }
+  });
+}
+
+// ===== ドラッグ並び替え =====
+
+function setupPanelDrag(idx) {
+  const panelEl = document.getElementById(`panel-${idx}`);
+  const handle  = panelEl.querySelector('.btn--drag-handle');
+
+  // ハンドルを押したときだけパネルをドラッグ可能にする
+  handle.addEventListener('mousedown', () => {
+    panelEl.setAttribute('draggable', 'true');
+  });
+
+  panelEl.addEventListener('dragstart', (e) => {
+    dragPanelIdx = idx;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(idx)); // Firefox 対応
+    // setTimeoutで描画後にクラス適用（Ghost imageが透明にならないよう）
+    setTimeout(() => panelEl.classList.add('is-dragging'), 0);
+  });
+
+  panelEl.addEventListener('dragend', () => {
+    dragPanelIdx = null;
+    panelEl.setAttribute('draggable', 'false');
+    panelEl.classList.remove('is-dragging');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('is-drag-over'));
+  });
+
+  panelEl.addEventListener('dragover', (e) => {
+    if (dragPanelIdx === null || dragPanelIdx === idx) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!panelEl.classList.contains('is-drag-over')) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('is-drag-over'));
+      panelEl.classList.add('is-drag-over');
+    }
+  });
+
+  panelEl.addEventListener('dragleave', (e) => {
+    if (!panelEl.contains(e.relatedTarget)) {
+      panelEl.classList.remove('is-drag-over');
+    }
+  });
+
+  panelEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    panelEl.classList.remove('is-drag-over');
+    if (dragPanelIdx !== null && dragPanelIdx !== idx) {
+      swapPanelVisualOrder(dragPanelIdx, idx);
     }
   });
 }
@@ -572,6 +654,15 @@ async function init() {
 
     bindPanelEvents(i);
   }
+
+  // パネル表示順を復元
+  const savedOrder = settings.visualOrder;
+  if (Array.isArray(savedOrder) && savedOrder.length === panels.length) {
+    visualOrder = savedOrder.slice();
+  } else {
+    visualOrder = Array.from({ length: panels.length }, (_, i) => i);
+  }
+  applyVisualOrder();
 
   // レイアウト
   currentLayout = settings.layout ?? 'lp2-h';

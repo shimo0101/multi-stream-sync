@@ -16,10 +16,12 @@ const DEFAULTS = {
   p2Platform: 'youtube', p2Url: '', p2Start: '',
   p3Platform: 'youtube', p3Url: '', p3Start: '',
   // 共通
-  ytApiKey:   '',
-  ytRelayUrl: '',
-  twParent:   'localhost',
-  twRelayUrl: '',
+  ytApiKey:    '',
+  ytRelayUrl:  '',
+  twParent:    'localhost',
+  twRelayUrl:  '',
+  // パネル表示順（インデックス i のパネルに CSS order = visualOrder[i] を適用）
+  visualOrder: [],
 };
 
 const useExtStorage =
