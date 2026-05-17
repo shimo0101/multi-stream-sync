@@ -18,10 +18,13 @@
   },
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "webRequest",
+    "webRequestBlocking"
   ],
   "host_permissions": [
     "https://www.googleapis.com/*",
+    "https://player.twitch.tv/*",
     "wss://irc-ws.chat.twitch.tv/*"
   ],
   "browser_specific_settings": {
