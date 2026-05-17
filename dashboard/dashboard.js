@@ -625,6 +625,26 @@ document.getElementById('btn-sync').addEventListener('click', () => {
   }
 });
 
+// ⛶ 全画面トグル
+function setFullscreen(on) {
+  document.body.classList.toggle('is-fullscreen', on);
+}
+
+document.getElementById('btn-fullscreen').addEventListener('click', () => {
+  setFullscreen(!document.body.classList.contains('is-fullscreen'));
+});
+
+document.getElementById('btn-exit-fullscreen').addEventListener('click', () => {
+  setFullscreen(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key === 'f' || e.key === 'F') setFullscreen(!document.body.classList.contains('is-fullscreen'));
+  if (e.key === 'Escape') setFullscreen(false);
+});
+
 // ⚙ 共通設定トグル
 document.getElementById('btn-settings').addEventListener('click', () => {
   const el  = document.getElementById('global-settings');

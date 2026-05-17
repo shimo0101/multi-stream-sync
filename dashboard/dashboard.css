@@ -340,6 +340,32 @@ body {
   flex-shrink: 0;
 }
 
+/* ===== Full Screen Mode ===== */
+body.is-fullscreen .topbar         { display: none; }
+body.is-fullscreen .global-settings { display: none !important; }
+body.is-fullscreen .panel-config   { display: none; }
+body.is-fullscreen .statusbar      { display: none; }
+
+.btn--exit-fullscreen {
+  display: none;
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 200;
+  background: rgba(20, 20, 30, 0.6);
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  color: #9ca3af;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.25;
+  transition: opacity 0.2s;
+  backdrop-filter: blur(4px);
+}
+.btn--exit-fullscreen:hover { opacity: 1; }
+body.is-fullscreen .btn--exit-fullscreen { display: block; }
+
 /* ===== Responsive: モバイル ===== */
 @media (max-width: 640px) {
   .topbar {
