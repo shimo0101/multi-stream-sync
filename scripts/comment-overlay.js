@@ -11,13 +11,13 @@ export class CommentOverlay {
   #lastTime = null;
   #laneCount = 10;
   #speed = 220; // px/秒
+  #imageCache = new Map(); // url → HTMLImageElement | null(loading/failed)
 
   constructor(canvasElement) {
     this.#canvas = canvasElement;
     this.#ctx = canvasElement.getContext('2d');
     this.#syncSize();
 
-    // プレイヤーのリサイズに追従してキャンバスのビットマップサイズを更新
     new ResizeObserver(() => this.#syncSize()).observe(canvasElement.parentElement);
     this.#startLoop();
   }
@@ -36,20 +36,35 @@ export class CommentOverlay {
     return Math.max(14, Math.min(22, this.#laneHeight - 6));
   }
 
+  /** 画像をキャッシュつきで非同期ロード。未ロード時は null を返す。 */
+  #getImage(url) {
+    if (this.#imageCache.has(url)) return this.#imageCache.get(url);
+    this.#imageCache.set(url, null); // ロード中マーク
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload  = () => this.#imageCache.set(url, img);
+    img.onerror = () => this.#imageCache.set(url, null);
+    img.src = url;
+    return null;
+  }
+
   /**
    * コメントをキューに追加する。
    * @param {string} text
-   * @param {{ color?: string, lane?: number }} opts
+   * @param {{ color?: string, lane?: number, avatarUrl?: string|null }} opts
    */
-  addComment(text, { color = 'rgba(255,255,255,0.82)', lane = null } = {}) {
+  addComment(text, { color = 'rgba(255,255,255,0.82)', lane = null, avatarUrl = null } = {}) {
     if (this.#canvas.width === 0 || this.#canvas.height === 0) this.#syncSize();
-    if (this.#canvas.width === 0) return; // まだレイアウト未確定なら無視
+    if (this.#canvas.width === 0) return;
+    // アバターURLがあれば先にロード開始（表示前にキャッシュ済みにする）
+    if (avatarUrl) this.#getImage(avatarUrl);
     this.#comments.push({
       text,
       color,
       lane: lane ?? Math.floor(Math.random() * this.#laneCount),
       x: this.#canvas.width,
       textWidth: null,
+      avatarUrl,
     });
   }
 
@@ -79,24 +94,42 @@ export class CommentOverlay {
 
     const fs = this.#fontSize;
     const lh = this.#laneHeight;
+    const av = fs;    // アバターサイズ（フォントと同じ高さ）
+    const ag = 4;     // アバターとテキストの隙間
+
     ctx.font = `bold ${fs}px 'Meiryo','Hiragino Kaku Gothic Pro',sans-serif`;
     ctx.textBaseline = 'top';
 
     for (const c of this.#comments) {
-      const y = c.lane * lh + Math.floor((lh - fs) / 2);
+      const y     = c.lane * lh + Math.floor((lh - fs) / 2);
+      const textX = c.avatarUrl ? c.x + av + ag : c.x;
 
       if (c.textWidth == null) {
-        c.textWidth = ctx.measureText(c.text).width;
+        c.textWidth = ctx.measureText(c.text).width
+                    + (c.avatarUrl ? av + ag : 0);
+      }
+
+      // 丸アバター
+      if (c.avatarUrl) {
+        const img = this.#getImage(c.avatarUrl);
+        if (img) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(c.x + av / 2, y + av / 2, av / 2, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(img, c.x, y, av, av);
+          ctx.restore();
+        }
       }
 
       // 縁取りで可読性を確保
       ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-      ctx.lineWidth = 3;
-      ctx.lineJoin = 'round';
-      ctx.strokeText(c.text, c.x, y);
+      ctx.lineWidth   = 3;
+      ctx.lineJoin    = 'round';
+      ctx.strokeText(c.text, textX, y);
 
       ctx.fillStyle = c.color;
-      ctx.fillText(c.text, c.x, y);
+      ctx.fillText(c.text, textX, y);
     }
   }
 

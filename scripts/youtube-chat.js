@@ -131,7 +131,11 @@ export class YouTubeChatClient {
           const isOwner     = item.authorDetails?.isChatOwner     ?? false;
           const isModerator = item.authorDetails?.isChatModerator ?? false;
           const isMember    = item.authorDetails?.isChatSponsor   ?? false;
-          if (text) this.#onMessage({ text, isOwner, isModerator, isMember });
+          const hasRole     = isOwner || isModerator || isMember;
+          const avatarUrl   = hasRole
+            ? (item.authorDetails?.profileImageUrl ?? null)
+            : null;
+          if (text) this.#onMessage({ text, isOwner, isModerator, isMember, avatarUrl });
         }
       }
 

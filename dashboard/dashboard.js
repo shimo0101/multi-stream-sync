@@ -154,12 +154,12 @@ class PanelController {
       if (!this._ytChat) {
         this._ytChat = new YouTubeChatClient({
           apiKey:         settings.ytApiKey || '',
-          onMessage:      ({ text, isOwner, isModerator, isMember }) => {
+          onMessage:      ({ text, isOwner, isModerator, isMember, avatarUrl }) => {
             const color = isOwner     ? 'rgba(250,204,21,0.92)'
                         : isModerator ? 'rgba(96,165,250,0.92)'
                         : isMember    ? 'rgba(110,231,183,0.92)'
                         : 'rgba(255,255,255,0.82)';
-            this.overlay.addComment(text, { color });
+            this.overlay.addComment(text, { color, avatarUrl: avatarUrl ?? null });
           },
           onError:        (msg) => setStatus(`P${this.idx + 1} YouTube チャットエラー: ${msg}`, 'error'),
           onStatusChange: (s)   => updateChatBtn(this.idx, s, 'YouTube'),
