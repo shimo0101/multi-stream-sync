@@ -11,11 +11,13 @@ export class CommentOverlay {
   #lastTime = null;
   #laneCount = 10;
   #speed = 220; // px/秒
-  #imageCache = new Map(); // url → HTMLImageElement | null(loading/failed)
+  #imageCache = new Map();
+  #lastInLane = []; // 各レーンに最後に追加したコメントへの参照
 
   constructor(canvasElement) {
     this.#canvas = canvasElement;
     this.#ctx = canvasElement.getContext('2d');
+    this.#lastInLane = new Array(this.#laneCount).fill(null);
     this.#syncSize();
 
     new ResizeObserver(() => this.#syncSize()).observe(canvasElement.parentElement);
@@ -39,13 +41,41 @@ export class CommentOverlay {
   /** 画像をキャッシュつきで非同期ロード。未ロード時は null を返す。 */
   #getImage(url) {
     if (this.#imageCache.has(url)) return this.#imageCache.get(url);
-    this.#imageCache.set(url, null); // ロード中マーク
+    this.#imageCache.set(url, null);
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload  = () => this.#imageCache.set(url, img);
     img.onerror = () => this.#imageCache.set(url, null);
     img.src = url;
     return null;
+  }
+
+  /**
+   * 重なりを最小化するレーンを選ぶ。
+   * 各レーンの最後コメントの右端が画面右端より十分左にあれば空きとみなす。
+   * すべて埋まっている場合は最も右端が小さい（最も進んだ）レーンを選ぶ。
+   */
+  #pickLane() {
+    const W   = this.#canvas.width;
+    const GAP = 20; // 新コメント開始前に確保したい最小間隔（px）
+
+    let bestLane  = 0;
+    let bestRight = Infinity;
+
+    for (let i = 0; i < this.#laneCount; i++) {
+      const last = this.#lastInLane[i];
+      if (!last) return i; // 未使用レーンがあれば即採用
+
+      const rightEdge = last.x + (last.textWidth ?? W);
+      if (rightEdge <= W - GAP) return i; // 十分空いているレーン
+
+      if (rightEdge < bestRight) {
+        bestRight = rightEdge;
+        bestLane  = i;
+      }
+    }
+
+    return bestLane; // フォールバック: 最も余裕のあるレーン
   }
 
   /**
@@ -56,16 +86,19 @@ export class CommentOverlay {
   addComment(text, { color = 'rgba(255,255,255,0.82)', lane = null, avatarUrl = null } = {}) {
     if (this.#canvas.width === 0 || this.#canvas.height === 0) this.#syncSize();
     if (this.#canvas.width === 0) return;
-    // アバターURLがあれば先にロード開始（表示前にキャッシュ済みにする）
-    if (avatarUrl) this.#getImage(avatarUrl);
-    this.#comments.push({
+    if (avatarUrl) this.#getImage(avatarUrl); // 先行ロード
+
+    const chosenLane = lane ?? this.#pickLane();
+    const comment = {
       text,
       color,
-      lane: lane ?? Math.floor(Math.random() * this.#laneCount),
+      lane: chosenLane,
       x: this.#canvas.width,
       textWidth: null,
       avatarUrl,
-    });
+    };
+    this.#comments.push(comment);
+    this.#lastInLane[chosenLane] = comment;
   }
 
   #startLoop() {
@@ -94,8 +127,8 @@ export class CommentOverlay {
 
     const fs = this.#fontSize;
     const lh = this.#laneHeight;
-    const av = fs;    // アバターサイズ（フォントと同じ高さ）
-    const ag = 4;     // アバターとテキストの隙間
+    const av = fs; // アバターサイズ（フォントと同じ高さ）
+    const ag = 4;  // アバターとテキストの隙間
 
     ctx.font = `bold ${fs}px 'Meiryo','Hiragino Kaku Gothic Pro',sans-serif`;
     ctx.textBaseline = 'top';
