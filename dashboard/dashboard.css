@@ -160,6 +160,25 @@ body {
 .plat-btn--yt.active { background: #cc0000; color: #fff; }
 .plat-btn--tw.active { background: #6441a5; color: #fff; }
 
+/* ===== Collapse Button ===== */
+.btn--collapse {
+  background: transparent;
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  color: #4b5563;
+  padding: 3px 7px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.1s, background 0.1s, border-color 0.1s;
+}
+.btn--collapse:hover { color: #9ca3af; background: #1a1a2a; border-color: #3a3a5a; }
+.panel-config.is-collapsed .btn--collapse { color: #a78bfa; border-color: #6d28d9; }
+
+/* 折りたたみ時: 2行目以降（開始時刻・チャット行）を非表示 */
+.panel-config.is-collapsed .config-row ~ .config-row { display: none; }
+
 /* ===== Auto-fetch Button ===== */
 .btn--fetch {
   background: #1a3a2a;

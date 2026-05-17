@@ -41,7 +41,7 @@ let currentLayout = 'lp2-h';
 function createPanelHTML(idx) {
   return `
     <section class="panel" id="panel-${idx}" aria-label="プレイヤー ${idx + 1}">
-      <div class="panel-config">
+      <div class="panel-config" id="panel-config-${idx}">
         <div class="config-row">
           <div class="platform-switch" data-panel="${idx}">
             <button class="plat-btn plat-btn--yt active" data-platform="youtube">YouTube</button>
@@ -50,6 +50,7 @@ function createPanelHTML(idx) {
           <input type="text" id="url-${idx}" class="input input--url"
                  placeholder="URL を入力（自動判別）" autocomplete="off">
           <button id="btn-load-${idx}" class="btn btn--load">読込</button>
+          <button id="btn-collapse-${idx}" class="btn--collapse" title="ツールバーを折りたたむ">▲</button>
         </div>
         <div class="config-row">
           <label class="config-label" for="start-${idx}">配信開始</label>
@@ -371,6 +372,15 @@ function bindPanelEvents(idx) {
   // 微調整ボタン
   document.querySelectorAll(`.btn--ft[data-panel="${idx}"]`).forEach(btn => {
     btn.addEventListener('click', () => panels[idx].adjustStartTime(Number(btn.dataset.delta)));
+  });
+
+  // 折りたたみボタン
+  document.getElementById(`btn-collapse-${idx}`).addEventListener('click', () => {
+    const config    = document.getElementById(`panel-config-${idx}`);
+    const btn       = document.getElementById(`btn-collapse-${idx}`);
+    const collapsed = config.classList.toggle('is-collapsed');
+    btn.textContent = collapsed ? '▼' : '▲';
+    btn.title = collapsed ? 'ツールバーを展開' : 'ツールバーを折りたたむ';
   });
 
   // チャットボタン
