@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=4">
+  <link rel="stylesheet" href="dashboard.css?v=5">
 </head>
 <body>
 
@@ -15,6 +15,7 @@
       <button id="btn-panel-add"    class="btn btn--secondary" title="パネルを追加">＋</button>
       <select id="sel-layout"   class="topbar-select" title="レイアウトを選択"></select>
       <button id="btn-fullscreen" class="btn btn--settings" title="全画面モード (F キー)">全画面</button>
+      <button id="btn-browser"   class="btn btn--settings" title="チャンネルブラウザ">チャンネル</button>
       <button id="btn-settings" class="btn btn--settings" title="共通設定を開く">⚙</button>
       <select id="sel-sync-ref" class="topbar-select" title="同期の基準パネル"></select>
       <button id="btn-sync"     class="btn btn--primary">⏱ 同期</button>
@@ -63,6 +64,33 @@
     <span id="status-msg">プレイヤーを読み込んでください</span>
   </footer>
 
-  <script type="module" src="dashboard.js?v=4"></script>
+  <!-- チャンネルブラウザ サイドバー -->
+  <aside class="channel-browser" id="channel-browser">
+    <div class="cb-header">
+      <span class="cb-title">チャンネル</span>
+      <button id="btn-cb-close" class="cb-close">✕</button>
+    </div>
+    <div class="cb-tabs">
+      <button class="cb-tab cb-tab--active" data-cb-tab="youtube">YouTube</button>
+      <button class="cb-tab" data-cb-tab="twitch">Twitch</button>
+    </div>
+    <div class="cb-pane" id="cb-pane-youtube">
+      <div class="cb-add-row">
+        <input id="cb-yt-input" class="input" placeholder="@ハンドル または チャンネルID">
+        <button id="cb-yt-add" class="btn btn--primary">追加</button>
+      </div>
+      <button id="cb-yt-refresh" class="btn btn--secondary cb-refresh-btn">ライブ確認</button>
+      <ul class="cb-list" id="cb-yt-list"></ul>
+    </div>
+    <div class="cb-pane cb-pane--hidden" id="cb-pane-twitch">
+      <div class="cb-add-row">
+        <input id="cb-tw-input" class="input" placeholder="チャンネル名">
+        <button id="cb-tw-add" class="btn btn--primary">追加</button>
+      </div>
+      <ul class="cb-list" id="cb-tw-list"></ul>
+    </div>
+  </aside>
+
+  <script type="module" src="dashboard.js?v=5"></script>
 </body>
 </html>

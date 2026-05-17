@@ -367,8 +367,181 @@ body.is-fullscreen .statusbar      { display: none; }
 .btn--exit-fullscreen:hover { opacity: 1; }
 body.is-fullscreen .btn--exit-fullscreen { display: block; }
 
+/* ===== Channel Browser Sidebar ===== */
+.channel-browser {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100%;
+  background: #13131c;
+  border-left: 1px solid #2a2a3a;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow: hidden;
+}
+.channel-browser.is-open { transform: translateX(0); }
+
+.cb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #1a1a24;
+  border-bottom: 1px solid #2a2a3a;
+  flex-shrink: 0;
+}
+.cb-title { font-size: 14px; font-weight: 700; color: #a78bfa; }
+.cb-close {
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.cb-close:hover { color: #e0e0e0; background: #2a2a3a; }
+
+.cb-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid #2a2a3a;
+}
+.cb-tab {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.1s, border-color 0.1s;
+}
+.cb-tab:hover { color: #9ca3af; }
+.cb-tab--active { color: #a78bfa; border-bottom-color: #7c3aed; }
+
+.cb-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.cb-pane--hidden { display: none; }
+
+.cb-add-row { display: flex; gap: 6px; }
+.cb-add-row .input { flex: 1; min-width: 0; font-size: 12px; padding: 5px 8px; }
+.cb-add-row .btn   { padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
+
+.cb-refresh-btn { font-size: 12px; padding: 5px 10px; align-self: flex-start; }
+
+.cb-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.cb-empty { font-size: 12px; color: #4b5563; padding: 8px 0; }
+
+.cb-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #1a1a2a;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.cb-item.is-live { border-color: #dc2626; }
+
+.cb-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #2a2a3a;
+}
+.cb-avatar-initial {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.cb-info { flex: 1; min-width: 0; }
+.cb-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cb-status {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cb-live-badge {
+  display: inline-block;
+  background: #dc2626;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+
+.cb-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; align-items: flex-end; }
+.cb-panel-row { display: flex; gap: 3px; }
+
+.cb-open-btn {
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #1e3a5f;
+  color: #93c5fd;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.cb-open-btn:hover:not(:disabled) { background: #2563eb; color: #fff; }
+.cb-open-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.cb-del-btn {
+  padding: 2px 6px;
+  font-size: 11px;
+  background: transparent;
+  color: #4b5563;
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+  line-height: 1.4;
+}
+.cb-del-btn:hover { color: #f87171; border-color: #dc2626; }
+
 /* ===== Responsive: モバイル ===== */
 @media (max-width: 640px) {
+  .channel-browser { width: 100%; }
+
   .topbar {
     height: auto;
     padding: 8px 12px;

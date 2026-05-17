@@ -638,6 +638,7 @@ document.getElementById('btn-sync').addEventListener('click', () => {
 // ⛶ 全画面トグル
 function setFullscreen(on) {
   document.body.classList.toggle('is-fullscreen', on);
+  if (on) cbClose();
 }
 
 document.getElementById('btn-fullscreen').addEventListener('click', () => {
@@ -689,3 +690,312 @@ document.getElementById('tw-relay-url').addEventListener('change', (e) => {
 });
 
 init().catch(console.error);
+
+// ===== チャンネルブラウザ =====
+
+const CB_STORAGE_KEY = 'multi-stream-sync-favorites';
+
+// お気に入りデータ（ライブ状態はメモリのみ、永続化しない）
+let cbFavorites = { youtube: [], twitch: [] };
+
+function cbLoad() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CB_STORAGE_KEY) || '{}');
+    cbFavorites = {
+      youtube: (stored.youtube ?? []).map(ch => ({ ...ch, liveVideoId: null, liveTitle: null })),
+      twitch:  stored.twitch ?? [],
+    };
+  } catch {
+    cbFavorites = { youtube: [], twitch: [] };
+  }
+}
+
+function cbSave() {
+  try {
+    const data = {
+      youtube: cbFavorites.youtube.map(({ channelId, name, thumbnailUrl }) => ({ channelId, name, thumbnailUrl })),
+      twitch:  cbFavorites.twitch.map(({ username }) => ({ username })),
+    };
+    localStorage.setItem(CB_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
+}
+
+// YouTube: @ハンドル or チャンネルID → チャンネル情報を取得
+async function cbResolveYouTubeChannel(input) {
+  const apiKey = settings.ytApiKey;
+  if (!apiKey) throw new Error('YouTube API Key が未設定です（⚙ 共通設定で入力してください）');
+
+  const url = new URL('https://www.googleapis.com/youtube/v3/channels');
+  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('key', apiKey);
+
+  const clean = input.trim();
+  if (clean.startsWith('@')) {
+    url.searchParams.set('forHandle', clean.slice(1));
+  } else if (/^UC[\w-]{22}$/.test(clean)) {
+    url.searchParams.set('id', clean);
+  } else {
+    url.searchParams.set('forHandle', clean);
+  }
+
+  const res = await fetch(url);
+  if (res.status === 403) throw new Error('API キーが無効です');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const data = await res.json();
+  const item = data.items?.[0];
+  if (!item) throw new Error('チャンネルが見つかりません');
+
+  return {
+    channelId:    item.id,
+    name:         item.snippet.title,
+    thumbnailUrl: item.snippet.thumbnails?.default?.url ?? null,
+    liveVideoId:  null,
+    liveTitle:    null,
+  };
+}
+
+// YouTube: ライブ配信中の動画を取得
+async function cbFetchYouTubeLive(channelId) {
+  const apiKey = settings.ytApiKey;
+  if (!apiKey) return null;
+
+  const url = new URL('https://www.googleapis.com/youtube/v3/search');
+  url.searchParams.set('channelId', channelId);
+  url.searchParams.set('type', 'video');
+  url.searchParams.set('eventType', 'live');
+  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('maxResults', '1');
+  url.searchParams.set('key', apiKey);
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const item = data.items?.[0];
+    if (!item) return null;
+    return { videoId: item.id.videoId, title: item.snippet.title };
+  } catch {
+    return null;
+  }
+}
+
+// パネル選択ボタンを生成（現在存在するパネル数に応じて）
+function cbPanelButtons(openAttr, enabled) {
+  return panels.map((_, pi) =>
+    `<button class="cb-open-btn" ${openAttr}="${pi}" ${enabled ? '' : 'disabled'}>P${pi + 1}</button>`
+  ).join('');
+}
+
+function cbRenderYtList() {
+  const list = document.getElementById('cb-yt-list');
+  if (!cbFavorites.youtube.length) {
+    list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
+    return;
+  }
+  list.innerHTML = cbFavorites.youtube.map((ch, i) => `
+    <li class="cb-item${ch.liveVideoId ? ' is-live' : ''}">
+      ${ch.thumbnailUrl
+        ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
+        : `<div class="cb-avatar-initial" style="background:#cc0000">${escHtml(ch.name[0] ?? '?')}</div>`
+      }
+      <div class="cb-info">
+        <div class="cb-name">${escHtml(ch.name)}</div>
+        <div class="cb-status">
+          ${ch.liveVideoId
+            ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
+            : '配信なし'}
+        </div>
+      </div>
+      <div class="cb-actions">
+        <div class="cb-panel-row">
+          ${panels.map((_, pi) =>
+            `<button class="cb-open-btn" data-cb-yt-open="${i}" data-panel="${pi}"
+                     ${ch.liveVideoId ? '' : 'disabled'}>P${pi + 1}</button>`
+          ).join('')}
+        </div>
+        <button class="cb-del-btn" data-cb-yt-del="${i}">✕</button>
+      </div>
+    </li>
+  `).join('');
+}
+
+function cbRenderTwList() {
+  const list = document.getElementById('cb-tw-list');
+  if (!cbFavorites.twitch.length) {
+    list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
+    return;
+  }
+  list.innerHTML = cbFavorites.twitch.map((ch, i) => `
+    <li class="cb-item">
+      <div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>
+      <div class="cb-info">
+        <div class="cb-name">${escHtml(ch.username)}</div>
+        <div class="cb-status">Twitch</div>
+      </div>
+      <div class="cb-actions">
+        <div class="cb-panel-row">
+          ${panels.map((_, pi) =>
+            `<button class="cb-open-btn" data-cb-tw-open="${i}" data-panel="${pi}">P${pi + 1}</button>`
+          ).join('')}
+        </div>
+        <button class="cb-del-btn" data-cb-tw-del="${i}">✕</button>
+      </div>
+    </li>
+  `).join('');
+}
+
+function cbOpen() {
+  cbRenderYtList();
+  cbRenderTwList();
+  document.getElementById('channel-browser').classList.add('is-open');
+  document.getElementById('btn-browser').classList.add('is-open');
+}
+
+function cbClose() {
+  document.getElementById('channel-browser').classList.remove('is-open');
+  document.getElementById('btn-browser').classList.remove('is-open');
+}
+
+// ブラウザ開閉
+document.getElementById('btn-browser').addEventListener('click', () => {
+  document.getElementById('channel-browser').classList.contains('is-open') ? cbClose() : cbOpen();
+});
+document.getElementById('btn-cb-close').addEventListener('click', cbClose);
+
+// タブ切り替え
+document.querySelectorAll('.cb-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.cb-tab').forEach(t => t.classList.remove('cb-tab--active'));
+    document.querySelectorAll('.cb-pane').forEach(p => p.classList.add('cb-pane--hidden'));
+    tab.classList.add('cb-tab--active');
+    document.getElementById(`cb-pane-${tab.dataset.cbTab}`).classList.remove('cb-pane--hidden');
+  });
+});
+
+// YouTube: 追加（Enter / ボタン）
+async function cbYtAdd() {
+  const input = document.getElementById('cb-yt-input').value.trim();
+  if (!input) return;
+
+  const btn = document.getElementById('cb-yt-add');
+  btn.disabled = true;
+  btn.textContent = '検索中…';
+
+  try {
+    const ch = await cbResolveYouTubeChannel(input);
+    if (!cbFavorites.youtube.some(c => c.channelId === ch.channelId)) {
+      cbFavorites.youtube.push(ch);
+      cbSave();
+    }
+    document.getElementById('cb-yt-input').value = '';
+    cbRenderYtList();
+    setStatus(`YouTube "${ch.name}" を追加しました`, 'ok');
+  } catch (err) {
+    setStatus(`追加エラー: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '追加';
+  }
+}
+
+document.getElementById('cb-yt-add').addEventListener('click', cbYtAdd);
+document.getElementById('cb-yt-input').addEventListener('keydown', e => { if (e.key === 'Enter') cbYtAdd(); });
+
+// YouTube: ライブ確認
+document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
+  if (!cbFavorites.youtube.length) { setStatus('チャンネルを追加してください', 'error'); return; }
+  if (!settings.ytApiKey) { setStatus('YouTube API Key が未設定です', 'error'); return; }
+
+  const btn = document.getElementById('cb-yt-refresh');
+  btn.disabled = true;
+  btn.textContent = '確認中…';
+
+  await Promise.all(cbFavorites.youtube.map(async (ch, i) => {
+    const live = await cbFetchYouTubeLive(ch.channelId);
+    cbFavorites.youtube[i].liveVideoId = live?.videoId ?? null;
+    cbFavorites.youtube[i].liveTitle   = live?.title   ?? null;
+  }));
+
+  cbRenderYtList();
+  btn.disabled = false;
+  btn.textContent = 'ライブ確認';
+
+  const liveCount = cbFavorites.youtube.filter(c => c.liveVideoId).length;
+  setStatus(`ライブ確認完了 — ${liveCount} チャンネルが配信中`, liveCount > 0 ? 'ok' : 'info');
+});
+
+// Twitch: 追加
+function cbTwAdd() {
+  const username = document.getElementById('cb-tw-input').value.trim().toLowerCase();
+  if (!username) return;
+  if (!/^[a-z0-9_]{1,25}$/.test(username)) { setStatus('無効なチャンネル名です', 'error'); return; }
+
+  if (!cbFavorites.twitch.some(c => c.username === username)) {
+    cbFavorites.twitch.push({ username });
+    cbSave();
+  }
+  document.getElementById('cb-tw-input').value = '';
+  cbRenderTwList();
+  setStatus(`Twitch "${username}" を追加しました`, 'ok');
+}
+
+document.getElementById('cb-tw-add').addEventListener('click', cbTwAdd);
+document.getElementById('cb-tw-input').addEventListener('keydown', e => { if (e.key === 'Enter') cbTwAdd(); });
+
+// YouTube リスト: 削除・パネル展開（イベント委任）
+document.getElementById('cb-yt-list').addEventListener('click', (e) => {
+  const delIdx = e.target.dataset.cbYtDel;
+  if (delIdx != null) {
+    cbFavorites.youtube.splice(Number(delIdx), 1);
+    cbSave();
+    cbRenderYtList();
+    return;
+  }
+
+  const openIdx  = e.target.dataset.cbYtOpen;
+  const panelIdx = e.target.dataset.panel;
+  if (openIdx != null && panelIdx != null) {
+    const ch = cbFavorites.youtube[Number(openIdx)];
+    if (!ch?.liveVideoId) return;
+    const pi = Number(panelIdx);
+    panels[pi].setPlatform('youtube');
+    document.getElementById(`url-${pi}`).value = ch.liveVideoId;
+    panels[pi].load(ch.liveVideoId);
+    saveSettings({ [`p${pi}Platform`]: 'youtube', [`p${pi}Url`]: ch.liveVideoId });
+    cbClose();
+  }
+});
+
+// Twitch リスト: 削除・パネル展開（イベント委任）
+document.getElementById('cb-tw-list').addEventListener('click', (e) => {
+  const delIdx = e.target.dataset.cbTwDel;
+  if (delIdx != null) {
+    cbFavorites.twitch.splice(Number(delIdx), 1);
+    cbSave();
+    cbRenderTwList();
+    return;
+  }
+
+  const openIdx  = e.target.dataset.cbTwOpen;
+  const panelIdx = e.target.dataset.panel;
+  if (openIdx != null && panelIdx != null) {
+    const ch = cbFavorites.twitch[Number(openIdx)];
+    if (!ch?.username) return;
+    const pi = Number(panelIdx);
+    panels[pi].setPlatform('twitch');
+    document.getElementById(`url-${pi}`).value = ch.username;
+    panels[pi].load(ch.username);
+    saveSettings({ [`p${pi}Platform`]: 'twitch', [`p${pi}Url`]: ch.username });
+    cbClose();
+  }
+});
+
+// 起動時にお気に入りをロード
+cbLoad();
