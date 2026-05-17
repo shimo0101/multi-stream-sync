@@ -35,6 +35,7 @@ export class TwitchChatClient {
 
     this.#ws.onopen = () => {
       const nick = `justinfan${Math.floor(Math.random() * 80000) + 10000}`;
+      this.#send('CAP REQ :twitch.tv/tags');
       this.#send('PASS SCHMOOPIIE');
       this.#send(`NICK ${nick}`);
       this.#send(`JOIN #${this.#channel}`);
@@ -97,12 +98,22 @@ export class TwitchChatClient {
       return;
     }
 
-    // PRIVMSG パース:
-    // :username!username@username.tmi.twitch.tv PRIVMSG #channel :text
-    const m = line.match(/^:(\w+)!\w+@\S+ PRIVMSG #\S+ :(.+)$/);
-    if (m) {
-      const [, author, text] = m;
-      this.#onMessage({ text, author });
+    // タグ付き PRIVMSG（CAP REQ twitch.tv/tags 取得後）
+    // @badge-info=...;badges=subscriber/0;... :nick!... PRIVMSG #ch :text
+    const tagged = line.match(/^@(\S+) :\w+!\w+@\S+ PRIVMSG #\S+ :(.+)$/);
+    if (tagged) {
+      const [, tagStr, text] = tagged;
+      const tags     = Object.fromEntries(tagStr.split(';').map(t => t.split('=')));
+      const badges   = tags.badges ?? '';
+      const isMember = badges.includes('subscriber') || badges.includes('founder');
+      this.#onMessage({ text, isMember });
+      return;
+    }
+
+    // タグなし PRIVMSG（フォールバック）
+    const plain = line.match(/^:\w+!\w+@\S+ PRIVMSG #\S+ :(.+)$/);
+    if (plain) {
+      this.#onMessage({ text: plain[1], isMember: false });
     }
   }
 
