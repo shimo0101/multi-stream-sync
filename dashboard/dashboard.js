@@ -1108,5 +1108,28 @@ document.getElementById('cb-tw-list').addEventListener('click', (e) => {
   }
 });
 
+// YouTube: 動画ピッカーを新タブで開く
+document.getElementById('cb-yt-picker').addEventListener('click', () => {
+  const pickerUrl = new URL('../picker/index.html', location.href).href;
+  window.open(pickerUrl, 'mss-picker');
+});
+
+// picker ページからの BroadcastChannel メッセージを受信
+try {
+  const pickerBC = new BroadcastChannel('mss-picker');
+  pickerBC.addEventListener('message', (e) => {
+    const { type, platform, videoId, panelIdx } = e.data || {};
+    if (type !== 'mss-open-video' || !videoId) return;
+    const pi = Number(panelIdx);
+    if (!Number.isFinite(pi) || pi < 0 || pi >= panels.length) return;
+    const plat = platform === 'youtube' ? 'youtube' : 'twitch';
+    panels[pi].setPlatform(plat);
+    document.getElementById(`url-${pi}`).value = videoId;
+    panels[pi].load(videoId);
+    saveSettings({ [`p${pi}Platform`]: plat, [`p${pi}Url`]: videoId });
+    setStatus(`P${pi + 1} に動画を読み込みました（ピッカーから）`, 'ok');
+  });
+} catch {}
+
 // 起動時にお気に入りをロード
 cbLoad();

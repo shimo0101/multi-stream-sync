@@ -463,6 +463,9 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .cb-add-row .input { flex: 1; min-width: 0; font-size: 12px; padding: 5px 8px; }
 .cb-add-row .btn   { padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
 
+.cb-action-row { display: flex; gap: 6px; }
+.cb-action-row .btn { font-size: 12px; padding: 5px 10px; flex: 1; }
+
 .cb-refresh-btn { font-size: 12px; padding: 5px 10px; align-self: flex-start; }
 
 .cb-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }

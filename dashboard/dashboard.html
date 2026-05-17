@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=9">
+  <link rel="stylesheet" href="dashboard.css?v=10">
 </head>
 <body>
 
@@ -80,7 +80,10 @@
         <input id="cb-yt-input" class="input" placeholder="@ハンドル または チャンネルID">
         <button id="cb-yt-add" class="btn btn--primary">追加</button>
       </div>
-      <button id="cb-yt-refresh" class="btn btn--secondary cb-refresh-btn">ライブ確認</button>
+      <div class="cb-action-row">
+        <button id="cb-yt-refresh" class="btn btn--secondary">ライブ確認</button>
+        <button id="cb-yt-picker"  class="btn btn--secondary">動画を探す ↗</button>
+      </div>
       <ul class="cb-list" id="cb-yt-list"></ul>
     </div>
     <div class="cb-pane cb-pane--hidden" id="cb-pane-twitch">
@@ -92,6 +95,6 @@
     </div>
   </aside>
 
-  <script type="module" src="dashboard.js?v=8"></script>
+  <script type="module" src="dashboard.js?v=9"></script>
 </body>
 </html>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>動画を探す — MultiStream Sync</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #0f0f13;
+      color: #e0e0e0;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 14px;
+    }
+
+    /* ===== Sticky header ===== */
+    .picker-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #1a1a24;
+      border-bottom: 1px solid #2a2a3a;
+      padding: 12px 16px 10px;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #cc0000;
+      letter-spacing: 0.02em;
+    }
+
+    #api-status {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    #api-status.ok  { color: #4ade80; }
+    #api-status.err { color: #f87171; }
+
+    .search-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    #q {
+      flex: 1;
+      background: #1a1a2a;
+      border: 1px solid #3a3a5a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 8px 12px;
+      font-size: 14px;
+      transition: border-color 0.12s;
+    }
+    #q:focus { outline: none; border-color: #cc0000; }
+
+    #btn-search {
+      background: #cc0000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.12s;
+    }
+    #btn-search:hover:not(:disabled) { background: #aa0000; }
+    #btn-search:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ===== Channel filter chips ===== */
+    .chip-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      background: #1a1a2a;
+      border: 1px solid #3a3a5a;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #9ca3af;
+      cursor: pointer;
+      transition: all 0.12s;
+      white-space: nowrap;
+    }
+    .chip:hover { background: #2a2a3a; color: #e0e0e0; }
+    .chip.is-active { background: #2a0a0a; border-color: #cc0000; color: #fca5a5; }
+    .chip-all.is-active { background: #0a2a0a; border-color: #16a34a; color: #86efac; }
+
+    .chip-avatar {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    /* ===== Main content ===== */
+    main {
+      padding: 16px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .hint-text {
+      color: #4b5563;
+      font-size: 13px;
+      padding: 40px 0;
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    .api-warning {
+      background: #1a1500;
+      border: 1px solid #854d0e;
+      border-radius: 8px;
+      padding: 16px 20px;
+      color: #fde68a;
+      font-size: 13px;
+      line-height: 1.8;
+      margin-bottom: 16px;
+    }
+    .api-warning code {
+      background: #2a2500;
+      border: 1px solid #854d0e;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 12px;
+    }
+
+    .loading-text {
+      text-align: center;
+      padding: 40px;
+      color: #4b5563;
+      font-size: 13px;
+    }
+
+    .error-text {
+      background: #1a0a0a;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      padding: 14px 18px;
+      color: #fca5a5;
+      font-size: 13px;
+    }
+
+    /* ===== Video grid ===== */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .video-card {
+      background: #1a1a2a;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .video-card:hover { border-color: #cc0000; box-shadow: 0 0 0 1px #cc000033; }
+
+    .video-thumb {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #0a0a10;
+      overflow: hidden;
+    }
+    .video-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .live-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: #dc2626;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      letter-spacing: 0.05em;
+    }
+
+    .video-info {
+      padding: 10px 10px 6px;
+    }
+    .video-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e0e0e0;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    .video-meta {
+      font-size: 11px;
+      color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ===== Panel buttons ===== */
+    .video-panel-row {
+      display: flex;
+      gap: 5px;
+      padding: 6px 10px 10px;
+      align-items: center;
+    }
+
+    .panel-label {
+      font-size: 11px;
+      color: #4b5563;
+      margin-right: 2px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-panel {
+      padding: 4px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #1e3a5f;
+      color: #93c5fd;
+      border: 1px solid #2563eb;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.1s;
+      flex-shrink: 0;
+    }
+    .btn-panel:hover { background: #2563eb; color: #fff; }
+
+    /* ===== Toast ===== */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0a2a0a;
+      border: 1px solid #16a34a;
+      color: #86efac;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 1000;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 560px) {
+      .video-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="picker-header">
+    <div class="header-title">
+      <h1>YouTube 動画を探す</h1>
+      <span id="api-status"></span>
+    </div>
+    <div class="search-row">
+      <input type="text" id="q" placeholder="キーワードを入力…" autocomplete="off">
+      <button id="btn-search">検索</button>
+    </div>
+    <div class="chip-row" id="chip-row"></div>
+  </header>
+
+  <main>
+    <div id="results"></div>
+  </main>
+
+  <div id="toast" hidden></div>
+
+  <script>
+    const SETTINGS_KEY = 'multi-stream-sync-settings';
+    const FAV_KEY      = 'multi-stream-sync-favorites';
+    const BC_NAME      = 'mss-picker';
+    const PANEL_COUNT  = 4;
+
+    let apiKey    = '';
+    let favorites = [];
+    let activeChannelId = null; // null = all
+
+    // ===== Load from localStorage =====
+
+    function loadStorage() {
+      try {
+        const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        apiKey = s.ytApiKey || '';
+      } catch {}
+      try {
+        const f = JSON.parse(localStorage.getItem(FAV_KEY) || '{}');
+        favorites = f.youtube || [];
+      } catch {}
+    }
+
+    // ===== BroadcastChannel =====
+
+    let bc = null;
+    function initBC() {
+      try { bc = new BroadcastChannel(BC_NAME); } catch {}
+    }
+
+    function sendToPanel(videoId, panelIdx) {
+      if (bc) {
+        bc.postMessage({ type: 'mss-open-video', platform: 'youtube', videoId, panelIdx });
+      }
+      showToast(`P${panelIdx + 1} に送信しました — "${videoId}"`);
+    }
+
+    // ===== Chip rendering =====
+
+    function renderChips() {
+      const row = document.getElementById('chip-row');
+      row.innerHTML = '';
+
+      const allBtn = document.createElement('button');
+      allBtn.className = 'chip chip-all' + (activeChannelId === null ? ' is-active' : '');
+      allBtn.textContent = 'すべて';
+      allBtn.addEventListener('click', () => {
+        activeChannelId = null;
+        renderChips();
+      });
+      row.appendChild(allBtn);
+
+      for (const ch of favorites) {
+        const btn = document.createElement('button');
+        btn.className = 'chip' + (activeChannelId === ch.channelId ? ' is-active' : '');
+
+        if (ch.thumbnailUrl) {
+          const img = document.createElement('img');
+          img.className = 'chip-avatar';
+          img.src = ch.thumbnailUrl;
+          img.alt = '';
+          btn.appendChild(img);
+        }
+        btn.appendChild(document.createTextNode(ch.name));
+        btn.addEventListener('click', () => {
+          activeChannelId = ch.channelId;
+          renderChips();
+          doSearch();
+        });
+        row.appendChild(btn);
+      }
+    }
+
+    // ===== Utilities =====
+
+    function relativeTime(isoStr) {
+      const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+      if (diff < 60)    return `${diff}秒前`;
+      if (diff < 3600)  return `${Math.floor(diff / 60)}分前`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
+      if (diff < 2592000) return `${Math.floor(diff / 86400)}日前`;
+      return `${Math.floor(diff / 2592000)}ヶ月前`;
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+      );
+    }
+
+    // ===== API search =====
+
+    async function doSearch() {
+      if (!apiKey) {
+        showApiWarning();
+        return;
+      }
+      const q = document.getElementById('q').value.trim();
+      if (!activeChannelId && !q) return;
+
+      const btn = document.getElementById('btn-search');
+      btn.disabled    = true;
+      btn.textContent = '検索中…';
+      document.getElementById('results').innerHTML = '<p class="loading-text">検索中…</p>';
+
+      try {
+        const url = new URL('https://www.googleapis.com/youtube/v3/search');
+        url.searchParams.set('part',       'snippet');
+        url.searchParams.set('type',       'video');
+        url.searchParams.set('maxResults', '20');
+        url.searchParams.set('key',        apiKey);
+
+        if (activeChannelId) {
+          url.searchParams.set('channelId', activeChannelId);
+          url.searchParams.set('order',     'date');
+          if (q) url.searchParams.set('q', q);
+        } else {
+          url.searchParams.set('q',     q);
+          url.searchParams.set('order', 'relevance');
+        }
+
+        const res = await fetch(url);
+        if (res.status === 403) throw new Error('API キーが無効または quota 超過です');
+        if (!res.ok)            throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        renderResults(data.items || []);
+      } catch (err) {
+        document.getElementById('results').innerHTML =
+          `<div class="error-text">検索エラー: ${escHtml(err.message)}</div>`;
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = '検索';
+      }
+    }
+
+    // ===== Result rendering =====
+
+    function renderResults(items) {
+      const container = document.getElementById('results');
+      if (!items.length) {
+        container.innerHTML = '<p class="hint-text">結果が見つかりませんでした</p>';
+        return;
+      }
+
+      const grid = document.createElement('div');
+      grid.className = 'video-grid';
+
+      for (const item of items) {
+        const videoId = item.id?.videoId;
+        if (!videoId) continue;
+
+        const sn     = item.snippet;
+        const thumb  = sn.thumbnails?.medium?.url || sn.thumbnails?.default?.url || '';
+        const isLive = sn.liveBroadcastContent === 'live';
+        const meta   = escHtml(sn.channelTitle) + (isLive ? '' : ' · ' + relativeTime(sn.publishedAt));
+
+        const panelBtns = Array.from({ length: PANEL_COUNT }, (_, pi) =>
+          `<button class="btn-panel" data-video-id="${escHtml(videoId)}" data-panel="${pi}">P${pi + 1}</button>`
+        ).join('');
+
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.innerHTML = `
+          <div class="video-thumb">
+            ${thumb ? `<img src="${escHtml(thumb)}" alt="" loading="lazy">` : ''}
+            ${isLive ? '<span class="live-badge">LIVE</span>' : ''}
+          </div>
+          <div class="video-info">
+            <div class="video-title">${escHtml(sn.title)}</div>
+            <div class="video-meta">${meta}</div>
+          </div>
+          <div class="video-panel-row">
+            <span class="panel-label">開く→</span>
+            ${panelBtns}
+          </div>`;
+
+        grid.appendChild(card);
+      }
+
+      container.innerHTML = '';
+      container.appendChild(grid);
+    }
+
+    // ===== API warning =====
+
+    function showApiWarning() {
+      document.getElementById('results').innerHTML = `
+        <div class="api-warning">
+          YouTube API Key が設定されていません。<br>
+          ダッシュボードの <strong>⚙ 共通設定</strong> から
+          <code>YouTube API Key</code> を入力して保存してから、このページを開き直してください。
+        </div>`;
+    }
+
+    // ===== Toast =====
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.hidden = true; }, 2500);
+    }
+
+    // ===== Event wiring =====
+
+    document.getElementById('btn-search').addEventListener('click', doSearch);
+    document.getElementById('q').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSearch();
+    });
+
+    // Panel button clicks — event delegation
+    document.getElementById('results').addEventListener('click', e => {
+      const btn = e.target.closest('.btn-panel');
+      if (!btn) return;
+      sendToPanel(btn.dataset.videoId, Number(btn.dataset.panel));
+    });
+
+    // ===== Init =====
+
+    loadStorage();
+    initBC();
+    renderChips();
+
+    const statusEl = document.getElementById('api-status');
+    if (apiKey) {
+      statusEl.textContent = '✓ API Key あり';
+      statusEl.className = 'ok';
+    } else {
+      statusEl.textContent = '⚠ API Key 未設定';
+      statusEl.className = 'err';
+      showApiWarning();
+    }
+
+    if (apiKey && !favorites.length) {
+      document.getElementById('results').innerHTML =
+        '<p class="hint-text">チャンネルを追加するか、キーワードを入力して検索してください<br>' +
+        '<small style="color:#374151">チャンネルのお気に入りはダッシュボードのチャンネルブラウザから登録できます</small></p>';
+    } else if (apiKey) {
+      document.getElementById('results').innerHTML =
+        '<p class="hint-text">チャンネルチップを選ぶか、キーワードを入力して検索してください</p>';
+    }
+  </script>
+</body>
+</html>
