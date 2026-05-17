@@ -51,6 +51,7 @@ function applyVisualOrder() {
 function swapPanelVisualOrder(idxA, idxB) {
   [visualOrder[idxA], visualOrder[idxB]] = [visualOrder[idxB], visualOrder[idxA]];
   applyVisualOrder();
+  refreshSyncRefSelector(); // 視覚位置が変わったので P1/P2 ラベルを更新
   saveSettings({ visualOrder: visualOrder.slice() });
 }
 
@@ -333,8 +334,11 @@ function applyLayout(layoutId) {
 
 function refreshSyncRefSelector() {
   const sel = document.getElementById('sel-sync-ref');
-  sel.innerHTML = panels.map((_, i) =>
-    `<option value="${i}"${i === syncRefIdx ? ' selected' : ''}>P${i + 1} 基準</option>`
+  // 視覚位置順（小 → 大）に並べた内部インデックス列
+  const byVisual = [...panels.keys()].sort((a, b) => (visualOrder[a] ?? a) - (visualOrder[b] ?? b));
+  // 選択肢を視覚位置順で表示し、value には内部インデックスを保持
+  sel.innerHTML = byVisual.map((internalIdx, visualPos) =>
+    `<option value="${internalIdx}"${internalIdx === syncRefIdx ? ' selected' : ''}>P${visualPos + 1} 基準</option>`
   ).join('');
 }
 
@@ -675,6 +679,15 @@ async function init() {
 
 // ＋ パネル追加
 document.getElementById('btn-panel-add').addEventListener('click', addPanel);
+
+// ↺ 並び順リセット
+document.getElementById('btn-order-reset').addEventListener('click', () => {
+  visualOrder = Array.from({ length: panels.length }, (_, i) => i);
+  applyVisualOrder();
+  refreshSyncRefSelector();
+  saveSettings({ visualOrder: visualOrder.slice() });
+  setStatus('パネルの並び順をリセットしました', 'ok');
+});
 
 // － パネル削除
 document.getElementById('btn-panel-remove').addEventListener('click', removePanel);
