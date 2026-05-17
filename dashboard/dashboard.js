@@ -154,9 +154,12 @@ class PanelController {
       if (!this._ytChat) {
         this._ytChat = new YouTubeChatClient({
           apiKey:         settings.ytApiKey || '',
-          onMessage:      ({ text, isMember }) => {
-            const color = isMember ? 'rgba(110,231,183,0.92)' : 'rgba(255,255,255,0.82)';
-            this.overlay.addComment(isMember ? `★ ${text}` : text, { color });
+          onMessage:      ({ text, isOwner, isModerator, isMember }) => {
+            const color = isOwner     ? 'rgba(250,204,21,0.92)'
+                        : isModerator ? 'rgba(96,165,250,0.92)'
+                        : isMember    ? 'rgba(110,231,183,0.92)'
+                        : 'rgba(255,255,255,0.82)';
+            this.overlay.addComment(text, { color });
           },
           onError:        (msg) => setStatus(`P${this.idx + 1} YouTube チャットエラー: ${msg}`, 'error'),
           onStatusChange: (s)   => updateChatBtn(this.idx, s, 'YouTube'),
@@ -166,9 +169,12 @@ class PanelController {
     } else {
       if (!this._twChat) {
         this._twChat = new TwitchChatClient({
-          onMessage:      ({ text, isMember }) => {
-            const color = isMember ? 'rgba(110,231,183,0.92)' : 'rgba(255,255,255,0.82)';
-            this.overlay.addComment(isMember ? `★ ${text}` : text, { color });
+          onMessage:      ({ text, isOwner, isModerator, isMember }) => {
+            const color = isOwner     ? 'rgba(250,204,21,0.92)'
+                        : isModerator ? 'rgba(96,165,250,0.92)'
+                        : isMember    ? 'rgba(110,231,183,0.92)'
+                        : 'rgba(255,255,255,0.82)';
+            this.overlay.addComment(text, { color });
           },
           onError:        (msg) => setStatus(`P${this.idx + 1} Twitch チャットエラー: ${msg}`, 'error'),
           onStatusChange: (s)   => updateChatBtn(this.idx, s, 'Twitch'),

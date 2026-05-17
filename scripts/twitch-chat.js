@@ -99,21 +99,23 @@ export class TwitchChatClient {
     }
 
     // タグ付き PRIVMSG（CAP REQ twitch.tv/tags 取得後）
-    // @badge-info=...;badges=subscriber/0;... :nick!... PRIVMSG #ch :text
+    // @badge-info=...;badges=broadcaster/1,moderator/1,subscriber/0;... :nick!... PRIVMSG #ch :text
     const tagged = line.match(/^@(\S+) :\w+!\w+@\S+ PRIVMSG #\S+ :(.+)$/);
     if (tagged) {
       const [, tagStr, text] = tagged;
-      const tags     = Object.fromEntries(tagStr.split(';').map(t => t.split('=')));
-      const badges   = tags.badges ?? '';
-      const isMember = badges.includes('subscriber') || badges.includes('founder');
-      this.#onMessage({ text, isMember });
+      const tags        = Object.fromEntries(tagStr.split(';').map(t => t.split('=')));
+      const badges      = tags.badges ?? '';
+      const isOwner     = badges.includes('broadcaster');
+      const isModerator = badges.includes('moderator');
+      const isMember    = badges.includes('subscriber') || badges.includes('founder');
+      this.#onMessage({ text, isOwner, isModerator, isMember });
       return;
     }
 
     // タグなし PRIVMSG（フォールバック）
     const plain = line.match(/^:\w+!\w+@\S+ PRIVMSG #\S+ :(.+)$/);
     if (plain) {
-      this.#onMessage({ text: plain[1], isMember: false });
+      this.#onMessage({ text: plain[1], isOwner: false, isModerator: false, isMember: false });
     }
   }
 

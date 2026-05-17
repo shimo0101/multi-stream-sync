@@ -127,9 +127,11 @@ export class YouTubeChatClient {
           if (this.#seenIds.has(item.id)) continue;
           this.#seenIds.add(item.id);
 
-          const text     = item.snippet?.displayMessage;
-          const isMember = item.authorDetails?.isChatSponsor ?? false;
-          if (text) this.#onMessage({ text, isMember });
+          const text        = item.snippet?.displayMessage;
+          const isOwner     = item.authorDetails?.isChatOwner     ?? false;
+          const isModerator = item.authorDetails?.isChatModerator ?? false;
+          const isMember    = item.authorDetails?.isChatSponsor   ?? false;
+          if (text) this.#onMessage({ text, isOwner, isModerator, isMember });
         }
       }
 
