@@ -35,6 +35,7 @@ export class TwitchChatClient {
 
     this.#ws.onopen = () => {
       const nick = `justinfan${Math.floor(Math.random() * 80000) + 10000}`;
+      this.#send('PASS SCHMOOPIIE');
       this.#send(`NICK ${nick}`);
       this.#send(`JOIN #${this.#channel}`);
       // Twitch は PING 無応答が続くと切断するため 4 分ごとに PING を送信

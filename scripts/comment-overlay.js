@@ -42,6 +42,8 @@ export class CommentOverlay {
    * @param {{ color?: string, lane?: number }} opts
    */
   addComment(text, { color = '#ffffff', lane = null } = {}) {
+    if (this.#canvas.width === 0 || this.#canvas.height === 0) this.#syncSize();
+    if (this.#canvas.width === 0) return; // まだレイアウト未確定なら無視
     this.#comments.push({
       text,
       color,
