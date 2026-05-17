@@ -746,6 +746,40 @@ document.getElementById('btn-sync').addEventListener('click', () => {
   }
 });
 
+// 全読込ボタン
+document.getElementById('btn-load-all').addEventListener('click', () => {
+  let loaded = 0;
+  panels.forEach((p, i) => {
+    const raw = document.getElementById(`url-${i}`).value.trim();
+    if (!raw) return;
+    p.load(raw);
+    saveSettings({ [`p${i}Url`]: raw });
+    loaded++;
+  });
+  if (loaded === 0) setStatus('読み込む URL がありません', 'error');
+  else setStatus(`${loaded} パネルを読み込み中…`);
+});
+
+// 全チャット開始ボタン
+document.getElementById('btn-chat-all').addEventListener('click', () => {
+  let started = 0;
+  panels.forEach((p, i) => {
+    const chat = p.getOrCreateChat();
+    if (p.platform === 'youtube') {
+      if (chat.isRunning() || !p.loadedId) return;
+      chat.updateApiKey(document.getElementById('yt-api-key').value.trim());
+      chat.start(p.loadedId);
+      started++;
+    } else {
+      if (chat.isConnected() || !p.loadedId) return;
+      chat.connect(p.loadedId);
+      started++;
+    }
+  });
+  if (started === 0) setStatus('チャットを開始できるパネルがありません（動画を先に読み込んでください）', 'error');
+  else setStatus(`${started} パネルのチャットを開始しました`, 'ok');
+});
+
 // ⛶ 全画面トグル
 function setFullscreen(on) {
   document.body.classList.toggle('is-fullscreen', on);
