@@ -15,36 +15,19 @@ browser.action.onClicked.addListener(async () => {
 });
 
 // ===== Twitch CSP 除去 =====
-// Twitch の player.twitch.tv は "frame-ancestors <relay-origin>" を返すが、
-// moz-extension:// が祖先フレームに含まれるため拒否される。
-// relay.html のオリジンから読み込まれた sub_frame に限定して CSP / X-Frame-Options を除去する。
-
-let twRelayOrigin = '';
-
-async function updateRelayOrigin() {
-  try {
-    const data = await browser.storage.local.get('twRelayUrl');
-    twRelayOrigin = data.twRelayUrl ? new URL(data.twRelayUrl).origin : '';
-  } catch {
-    twRelayOrigin = '';
-  }
-}
-
-updateRelayOrigin();
-browser.storage.onChanged.addListener((changes) => {
-  if ('twRelayUrl' in changes) updateRelayOrigin();
-});
+// Twitch の frame-ancestors CSP が moz-extension:// をブロックするため、
+// player.twitch.tv のサブフレームレスポンスから CSP と X-Frame-Options を除去する。
 
 browser.webRequest.onHeadersReceived.addListener(
   (details) => {
-    if (!twRelayOrigin) return {};
-    if (!(details.documentUrl ?? '').startsWith(twRelayOrigin)) return {};
-    return {
-      responseHeaders: details.responseHeaders.filter(h => {
-        const name = h.name.toLowerCase();
-        return name !== 'content-security-policy' && name !== 'x-frame-options';
-      }),
-    };
+    console.log('[MSS] webRequest intercept:', details.url, 'doc:', details.documentUrl);
+    const filtered = details.responseHeaders.filter(h => {
+      const name = h.name.toLowerCase();
+      const drop = name === 'content-security-policy' || name === 'x-frame-options';
+      if (drop) console.log('[MSS] dropped header:', h.name, '=', h.value);
+      return !drop;
+    });
+    return { responseHeaders: filtered };
   },
   { urls: ['https://player.twitch.tv/*'], types: ['sub_frame'] },
   ['blocking', 'responseHeaders']
