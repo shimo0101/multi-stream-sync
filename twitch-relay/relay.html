@@ -2,22 +2,19 @@
 <!--
   Twitch Relay Page
   ================
-  このファイルを任意の静的ホスティングサービス（GitHub Pages 等）に配置し、
-  拡張機能の「relay URL」フィールドにそのURLを入力することで
-  moz-extension:// の parent 制約を回避できます。
+  このファイルを GitHub Pages 等に配置し、拡張機能の「relay URL」に設定してください。
 
-  配置例:
-    https://your-account.github.io/twitch-relay/relay.html
-    → 拡張機能の relay URL に上記URLを設定
-    → parent ドメインは自動的に "your-account.github.io" が使用される
+  通信方式:
+    popup モード: window.open() で開いた場合 → window.opener と通信
+    iframe モード: iframe で埋め込んだ場合   → window.parent と通信（後方互換）
 
-  通信プロトコル (postMessage):
-    親 → relay:  { type: 'seek',           data: { time: number } }
-    親 → relay:  { type: 'getCurrentTime' }
-    親 → relay:  { type: 'play' }
-    親 → relay:  { type: 'pause' }
-    relay → 親:  { type: 'twitchReady' }
-    relay → 親:  { type: 'currentTime',    data: { time: number } }
+  postMessage プロトコル:
+    ホスト → relay:  { type: 'seek',           data: { time: number } }
+    ホスト → relay:  { type: 'getCurrentTime' }
+    ホスト → relay:  { type: 'play' }
+    ホスト → relay:  { type: 'pause' }
+    relay → ホスト:  { type: 'twitchReady' }
+    relay → ホスト:  { type: 'currentTime',    data: { time: number } }
 -->
 <html lang="ja">
 <head>
@@ -46,8 +43,16 @@
     const params  = new URLSearchParams(location.search);
     const channel = params.get('channel');
     const video   = params.get('video');
-    // このページ自身のホスト名を parent として使用する（外部から上書き可）
     const parent  = params.get('parent') || location.hostname || 'localhost';
+
+    // popup モード: window.open() で開かれた場合は window.opener と通信
+    // iframe モード: iframe 埋め込みの場合は window.parent と通信
+    const isPopup = Boolean(window.opener) && window.parent === window;
+    const host    = isPopup ? window.opener : window.parent;
+
+    function sendToHost(msg) {
+      host?.postMessage(msg, '*');
+    }
 
     function showError(msg) {
       const el = document.getElementById('error');
@@ -72,22 +77,18 @@
       const player = new Twitch.Player('player', options);
 
       player.addEventListener(Twitch.Player.READY, () => {
-        // ダッシュボードに準備完了を通知
-        window.parent.postMessage({ type: 'twitchReady' }, '*');
+        sendToHost({ type: 'twitchReady' });
       });
 
-      // ダッシュボードからの制御コマンドを受け取る
       window.addEventListener('message', (e) => {
+        if (e.source !== host) return;
         const { type, data } = e.data || {};
         switch (type) {
           case 'seek':
             player.seek(Math.max(0, data?.time ?? 0));
             break;
           case 'getCurrentTime':
-            e.source?.postMessage(
-              { type: 'currentTime', data: { time: player.getCurrentTime() } },
-              e.origin || '*'
-            );
+            sendToHost({ type: 'currentTime', data: { time: player.getCurrentTime() } });
             break;
           case 'play':
             player.play();

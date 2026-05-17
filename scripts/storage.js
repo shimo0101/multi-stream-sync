@@ -4,26 +4,27 @@
  */
 
 const DEFAULTS = {
-  ytUrl:      '',
-  twUrl:      '',
-  ytStart:    '',
-  twStart:    '',
-  layout:     'horizontal',
-  ytApiKey:   '',
-  twParent:   'localhost',  // Twitch Embed の parent ドメイン（sdk モード）
-  twRelayUrl: '',           // relay.html の URL（設定時は relay モードになる）
+  // パネル 0
+  p0Platform:   'youtube',
+  p0Url:        '',
+  p0Start:      '',
+  // パネル 1
+  p1Platform:   'twitch',
+  p1Url:        '',
+  p1Start:      '',
+  // 共通
+  layout:       'horizontal',
+  ytApiKey:     '',
+  ytRelayUrl:   '',           // youtube-relay/relay.html の URL
+  twParent:     'localhost',  // Twitch Embed の parent ドメイン（sdk モード）
+  twRelayUrl:   '',           // twitch-relay/relay.html の URL
 };
 
-/** 保存済み設定を取得する。未保存のキーはデフォルト値で補完される。 */
 export async function loadSettings() {
   const stored = await browser.storage.local.get(Object.keys(DEFAULTS));
   return { ...DEFAULTS, ...stored };
 }
 
-/**
- * 設定を部分的に保存する。スキーマ外のキーは無視される。
- * @param {Partial<typeof DEFAULTS>} partial
- */
 export async function saveSettings(partial) {
   const valid = Object.fromEntries(
     Object.entries(partial).filter(([k]) => k in DEFAULTS)

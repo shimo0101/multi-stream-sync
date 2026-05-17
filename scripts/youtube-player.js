@@ -1,66 +1,81 @@
 /**
- * YouTube IFrame Player API のラッパー。
- * API スクリプトを動的にロードし、プレイヤーの生成・再生制御を提供する。
+ * YouTube relay ページ（youtube-relay/relay.html）を iframe で埋め込み、
+ * postMessage で制御する YouTubePlayer。
+ *
+ * MV3 extension page では YouTube IFrame API スクリプトを読み込めず、
+ * moz-extension:// オリジンは YouTube 埋め込みが拒否されるため、
+ * 外部サーバーで配信した relay.html を経由して制御する。
  */
 export class YouTubePlayer {
-  #player = null;
+  #iframe = null;
   #containerId;
+  #relayUrl;
   #callbacks;
+  #cachedTime = 0;
+  #ready = false;
 
-  /** @param {string} containerId - プレイヤーを注入する要素の id */
-  constructor(containerId, { onReady = () => {}, onStateChange = () => {} } = {}) {
+  constructor(containerId, { onReady = () => {}, onStateChange = () => {}, relayUrl = '' } = {}) {
     this.#containerId = containerId;
-    this.#callbacks = { onReady, onStateChange };
-  }
+    this.#relayUrl    = relayUrl;
+    this.#callbacks   = { onReady, onStateChange };
 
-  /**
-   * 指定の動画IDでプレイヤーを初期化する。
-   * API 未ロード時は動的に script タグを挿入してからプレイヤーを生成する。
-   */
-  load(videoId) {
-    if (window.YT?.Player) {
-      this.#createPlayer(videoId);
-      return;
-    }
-
-    // グローバルコールバックをチェーン（複数インスタンスへの対応）
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      this.#createPlayer(videoId);
-    };
-
-    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-      const s = document.createElement('script');
-      s.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(s);
-    }
-  }
-
-  #createPlayer(videoId) {
-    // 既存プレイヤーがあれば破棄して再生成
-    this.#player?.destroy();
-    this.#player = new YT.Player(this.#containerId, {
-      videoId,
-      playerVars: { controls: 1, rel: 0, modestbranding: 1 },
-      events: {
-        onReady: () => this.#callbacks.onReady(this),
-        onStateChange: (e) => this.#callbacks.onStateChange(e.data),
-      },
+    window.addEventListener('message', (e) => {
+      if (!this.#iframe) return;
+      if (e.source !== this.#iframe.contentWindow) return;
+      const { type, data } = e.data || {};
+      this.#handleMsg(type, data);
     });
   }
 
-  /** 現在の再生位置（秒）を返す。未初期化時は null。 */
-  getCurrentTime() {
-    return this.#player?.getCurrentTime() ?? null;
+  load(videoId) {
+    const container = document.getElementById(this.#containerId);
+    if (!container) return;
+
+    if (!this.#relayUrl) {
+      container.innerHTML =
+        '<p style="color:#9ca3af;padding:16px;font-size:13px">▲ ⚙ 共通設定から YouTube relay URL を設定してください</p>';
+      return;
+    }
+
+    this.#ready = false;
+    this.#cachedTime = 0;
+    container.innerHTML = '';
+
+    const url = new URL(this.#relayUrl);
+    url.searchParams.set('v', videoId);
+
+    const iframe = document.createElement('iframe');
+    iframe.src           = url.toString();
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+    iframe.allow         = 'autoplay; fullscreen';
+    container.appendChild(iframe);
+    this.#iframe = iframe;
   }
 
-  /** 指定秒にシークする */
+  getCurrentTime() { return this.#ready ? this.#cachedTime : null; }
+
   seekTo(seconds) {
-    this.#player?.seekTo(Math.max(0, seconds), true);
+    this.#post({ type: 'ytSeek', data: { time: Math.max(0, seconds) } });
   }
 
-  isReady() {
-    return this.#player !== null;
+  isReady() { return this.#ready; }
+
+  setRelayUrl(url) { this.#relayUrl = url; }
+
+  #post(msg) { this.#iframe?.contentWindow?.postMessage(msg, '*'); }
+
+  #handleMsg(type, data) {
+    switch (type) {
+      case 'ytReady':
+        this.#ready = true;
+        this.#callbacks.onReady(this);
+        break;
+      case 'ytCurrentTime':
+        if (data?.time != null) this.#cachedTime = data.time;
+        break;
+      case 'ytStateChange':
+        this.#callbacks.onStateChange(data);
+        break;
+    }
   }
 }
