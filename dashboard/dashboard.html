@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=10">
+  <link rel="stylesheet" href="dashboard.css?v=11">
 </head>
 <body>
 
@@ -75,6 +75,8 @@
       <button class="cb-tab cb-tab--active" data-cb-tab="youtube">YouTube</button>
       <button class="cb-tab" data-cb-tab="twitch">Twitch</button>
     </div>
+    <!-- チャンネルブラウザ内ステータス（モバイル用） -->
+    <div class="cb-status-bar" id="cb-status-bar" hidden></div>
     <div class="cb-pane" id="cb-pane-youtube">
       <div class="cb-add-row">
         <input id="cb-yt-input" class="input" placeholder="@ハンドル または チャンネルID">
@@ -91,10 +93,13 @@
         <input id="cb-tw-input" class="input" placeholder="チャンネル名">
         <button id="cb-tw-add" class="btn btn--primary">追加</button>
       </div>
+      <div class="cb-action-row">
+        <button id="cb-tw-picker" class="btn btn--secondary">チャンネルを探す ↗</button>
+      </div>
       <ul class="cb-list" id="cb-tw-list"></ul>
     </div>
   </aside>
 
-  <script type="module" src="dashboard.js?v=9"></script>
+  <script type="module" src="dashboard.js?v=10"></script>
 </body>
 </html>

@@ -1007,9 +1007,9 @@ async function cbYtAdd() {
     }
     document.getElementById('cb-yt-input').value = '';
     cbRenderYtList();
-    setStatus(`YouTube "${ch.name}" を追加しました`, 'ok');
+    cbSetStatus(`YouTube "${ch.name}" を追加しました`, 'ok');
   } catch (err) {
-    setStatus(`追加エラー: ${err.message}`, 'error');
+    cbSetStatus(`追加エラー: ${err.message}`, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = '追加';
@@ -1021,8 +1021,8 @@ document.getElementById('cb-yt-input').addEventListener('keydown', e => { if (e.
 
 // YouTube: ライブ確認
 document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
-  if (!cbFavorites.youtube.length) { setStatus('チャンネルを追加してください', 'error'); return; }
-  if (!settings.ytApiKey) { setStatus('YouTube API Key が未設定です', 'error'); return; }
+  if (!cbFavorites.youtube.length) { cbSetStatus('チャンネルを追加してください', 'error'); return; }
+  if (!settings.ytApiKey) { cbSetStatus('YouTube API Key が未設定です（⚙ 共通設定）', 'error'); return; }
 
   const btn = document.getElementById('cb-yt-refresh');
   btn.disabled = true;
@@ -1039,14 +1039,14 @@ document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
   btn.textContent = 'ライブ確認';
 
   const liveCount = cbFavorites.youtube.filter(c => c.liveVideoId).length;
-  setStatus(`ライブ確認完了 — ${liveCount} チャンネルが配信中`, liveCount > 0 ? 'ok' : 'info');
+  cbSetStatus(`ライブ確認完了 — ${liveCount} チャンネルが配信中`, liveCount > 0 ? 'ok' : 'info');
 });
 
 // Twitch: 追加
 function cbTwAdd() {
   const username = document.getElementById('cb-tw-input').value.trim().toLowerCase();
   if (!username) return;
-  if (!/^[a-z0-9_]{1,25}$/.test(username)) { setStatus('無効なチャンネル名です', 'error'); return; }
+  if (!/^[a-z0-9_]{1,25}$/.test(username)) { cbSetStatus('無効なチャンネル名です', 'error'); return; }
 
   if (!cbFavorites.twitch.some(c => c.username === username)) {
     cbFavorites.twitch.push({ username });
@@ -1054,7 +1054,7 @@ function cbTwAdd() {
   }
   document.getElementById('cb-tw-input').value = '';
   cbRenderTwList();
-  setStatus(`Twitch "${username}" を追加しました`, 'ok');
+  cbSetStatus(`Twitch "${username}" を追加しました`, 'ok');
 }
 
 document.getElementById('cb-tw-add').addEventListener('click', cbTwAdd);
@@ -1108,9 +1108,29 @@ document.getElementById('cb-tw-list').addEventListener('click', (e) => {
   }
 });
 
+// ===== チャンネルブラウザ内ステータス（モバイルで底部ステータスバーが隠れる対策） =====
+
+let cbStatusTimer = null;
+function cbSetStatus(msg, type = 'info') {
+  setStatus(msg, type); // 底部ステータスバーも更新（デスクトップ用）
+  const el = document.getElementById('cb-status-bar');
+  if (!el) return;
+  el.textContent    = msg;
+  el.dataset.type   = type;
+  el.hidden         = false;
+  clearTimeout(cbStatusTimer);
+  cbStatusTimer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+
 // YouTube: 動画ピッカーを新タブで開く
 document.getElementById('cb-yt-picker').addEventListener('click', () => {
   const pickerUrl = new URL('../picker/index.html', location.href).href;
+  window.open(pickerUrl, 'mss-picker');
+});
+
+// Twitch: チャンネルピッカーを新タブで開く
+document.getElementById('cb-tw-picker').addEventListener('click', () => {
+  const pickerUrl = new URL('../picker/index.html?tab=twitch', location.href).href;
   window.open(pickerUrl, 'mss-picker');
 });
 

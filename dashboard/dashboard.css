@@ -395,6 +395,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   right: 0;
   width: 300px;
   height: 100%;
+  height: 100dvh; /* dynamic viewport height — Android でアドレスバー考慮 */
   background: #13131c;
   border-left: 1px solid #2a2a3a;
   z-index: 400;
@@ -405,6 +406,18 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   overflow: hidden;
 }
 .channel-browser.is-open { transform: translateX(0); }
+
+/* チャンネルブラウザ内ステータス（モバイルで底部が隠れる対策） */
+.cb-status-bar {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  border-bottom: 1px solid #2a2a3a;
+}
+.cb-status-bar[data-type="ok"]    { background: #0a2a0a; color: #86efac; }
+.cb-status-bar[data-type="error"] { background: #2a0a0a; color: #fca5a5; }
+.cb-status-bar[data-type="info"]  { background: #1a1a2a; color: #9ca3af; }
 
 .cb-header {
   display: flex;
@@ -455,6 +468,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   padding: 10px;
   gap: 8px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* iOS/古い Android でスムーズスクロール */
+  overscroll-behavior: contain;      /* 下端でページがスクロールしない */
   min-height: 0;
 }
 .cb-pane--hidden { display: none; }
