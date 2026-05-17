@@ -564,7 +564,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   /* タッチ操作では不要なコントロールを非表示 */
   #btn-order-reset,
   #sel-layout,
-  .btn--drag-handle { display: none !important; }
+  .btn--drag-handle,
+  .finetune-group { display: none !important; }
 
   .channel-browser { width: 100%; }
 
