@@ -1,7 +1,10 @@
 /**
- * browser.storage.local を使った設定永続化の薄いラッパー。
- * スキーマはここで一元管理し、未保存キーにはデフォルト値を返す。
+ * 設定の永続化。
+ * GitHub Pages (通常の Web ページ) では localStorage を使用。
+ * moz-extension:// コンテキストでは browser.storage.local を使用。
  */
+
+const STORAGE_KEY = 'multi-stream-sync-settings';
 
 const DEFAULTS = {
   // パネル 0
@@ -15,21 +18,39 @@ const DEFAULTS = {
   // 共通
   layout:       'horizontal',
   ytApiKey:     '',
-  ytRelayUrl:   '',           // youtube-relay/relay.html の URL
-  twParent:     'localhost',  // Twitch Embed の parent ドメイン（sdk モード）
-  twRelayUrl:   '',           // twitch-relay/relay.html の URL
+  ytRelayUrl:   '',
+  twParent:     'localhost',
+  twRelayUrl:   '',
 };
 
+const useExtStorage =
+  typeof browser !== 'undefined' && browser.storage?.local != null;
+
 export async function loadSettings() {
-  const stored = await browser.storage.local.get(Object.keys(DEFAULTS));
-  return { ...DEFAULTS, ...stored };
+  if (useExtStorage) {
+    const stored = await browser.storage.local.get(Object.keys(DEFAULTS));
+    return { ...DEFAULTS, ...stored };
+  }
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    return { ...DEFAULTS, ...stored };
+  } catch {
+    return { ...DEFAULTS };
+  }
 }
 
 export async function saveSettings(partial) {
   const valid = Object.fromEntries(
     Object.entries(partial).filter(([k]) => k in DEFAULTS)
   );
-  if (Object.keys(valid).length > 0) {
+  if (!Object.keys(valid).length) return;
+
+  if (useExtStorage) {
     await browser.storage.local.set(valid);
+  } else {
+    try {
+      const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...valid }));
+    } catch {}
   }
 }

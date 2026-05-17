@@ -18,15 +18,9 @@
   },
   "permissions": [
     "storage",
-    "tabs",
-    "webRequest",
-    "webRequestBlocking"
+    "tabs"
   ],
-  "host_permissions": [
-    "https://www.googleapis.com/*",
-    "https://player.twitch.tv/*",
-    "wss://irc-ws.chat.twitch.tv/*"
-  ],
+  "host_permissions": [],
   "browser_specific_settings": {
     "gecko": {
       "id": "multi-stream-sync@local",

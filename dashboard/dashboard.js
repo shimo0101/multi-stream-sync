@@ -303,6 +303,20 @@ async function fetchYouTubeStartTime(videoId, apiKey) {
 async function init() {
   settings = await loadSettings();
 
+  // GitHub Pages で動作中の場合、relay URL をリポジトリ内の相対パスで自動設定
+  if (location.hostname.endsWith('github.io') && !settings.ytRelayUrl && !settings.twRelayUrl) {
+    const parts   = location.pathname.split('/');          // ['','repo','dashboard','dashboard.html']
+    const repoBase = location.origin + '/' + parts[1] + '/'; // 'https://xxx.github.io/repo/'
+    settings.ytRelayUrl = repoBase + 'youtube-relay/relay.html';
+    settings.twRelayUrl = repoBase + 'twitch-relay/relay.html';
+    settings.twParent   = location.hostname;
+    await saveSettings({
+      ytRelayUrl: settings.ytRelayUrl,
+      twRelayUrl: settings.twRelayUrl,
+      twParent:   settings.twParent,
+    });
+  }
+
   // 共通設定フォームを復元
   setValue('yt-api-key',  settings.ytApiKey);
   setValue('yt-relay-url', settings.ytRelayUrl);
