@@ -561,13 +561,22 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 
 /* ===== Responsive: モバイル ===== */
 @media (max-width: 640px) {
+  /* タッチ操作では不要なコントロールを非表示 */
+  #btn-order-reset,
+  #sel-layout,
+  .btn--drag-handle { display: none !important; }
+
   .channel-browser { width: 100%; }
 
-  .topbar {
-    height: auto;
-    padding: 8px 12px;
-    flex-wrap: wrap;
-  }
+  /* トップバー: コンパクト化 */
+  .app-title { font-size: 12px; }
+  .topbar { height: auto; padding: 5px 10px; gap: 4px; flex-wrap: wrap; }
+  .topbar-controls { gap: 4px; flex-wrap: wrap; }
+
+  /* トップバー内ボタン: パネル内ボタンより小さく（視聴領域を優先） */
+  .topbar-controls .btn         { padding: 5px 9px; font-size: 12px; min-height: 32px; }
+  .topbar-controls .btn--settings { font-size: 13px; padding: 4px 8px; min-height: 32px; }
+  .topbar-select { height: 32px; font-size: 11px; padding: 3px 5px; }
 
   /* モバイルでは常に縦1列 */
   .stage {
@@ -579,14 +588,17 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
     grid-row: unset !important;
   }
 
-  .panel-config { padding: 6px 10px; gap: 5px; }
+  /* パネルツールバー: 折りたたみ時のボタンを大きく（タッチしやすく） */
+  .panel-config { padding: 5px 10px; gap: 4px; }
+  .btn--collapse { padding: 5px 10px; font-size: 13px; }
 
+  /* パネル内の入力・ボタンはタッチ向けに十分な高さ */
   .input { font-size: 16px; padding: 7px 10px; }
-  .input--time { width: 120px; }
+  .input--time { width: 100px; }
 
   .btn { padding: 8px 12px; min-height: 40px; }
-  .btn--load { min-height: 40px; }
-  .btn--chat { min-height: 40px; }
+  .btn--load  { min-height: 40px; }
+  .btn--chat  { min-height: 40px; }
   .btn--fetch { padding: 8px 10px; min-height: 40px; }
 
   .finetune-group {
@@ -603,4 +615,6 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 
 @media (max-width: 480px) {
   .plat-btn { padding: 4px 7px; font-size: 10px; }
+  /* 極小画面: sync ref セレクターを短縮 */
+  #sel-sync-ref { max-width: 80px; }
 }

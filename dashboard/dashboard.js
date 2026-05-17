@@ -425,6 +425,13 @@ function bindPanelEvents(idx) {
     btn.title = collapsed ? 'ツールバーを展開' : 'ツールバーを折りたたむ';
   });
 
+  // モバイル（幅 640px 以下）ではデフォルトでツールバーを折りたたむ
+  if (window.matchMedia('(max-width: 640px)').matches) {
+    document.getElementById(`panel-config-${idx}`).classList.add('is-collapsed');
+    document.getElementById(`btn-collapse-${idx}`).textContent = '▼';
+    document.getElementById(`btn-collapse-${idx}`).title = 'ツールバーを展開';
+  }
+
   // ドラッグ並び替え
   setupPanelDrag(idx);
 
