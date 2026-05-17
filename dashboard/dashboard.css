@@ -38,9 +38,23 @@ body {
 
 .topbar-controls {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  align-items: center;
 }
+
+.topbar-select {
+  background: #1a1a2a;
+  border: 1px solid #3a3a5a;
+  border-radius: 5px;
+  color: #c4b5fd;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 32px;
+}
+.topbar-select:focus { outline: none; border-color: #7c3aed; }
 
 /* ===== Buttons ===== */
 .btn {
@@ -82,17 +96,6 @@ body {
 }
 .btn--settings:hover { background: #2a2a3a; color: #e0e0e0; }
 .btn--settings.is-open { background: #2a2a4a; color: #a78bfa; border-color: #6d28d9; }
-
-.btn--sync-dir {
-  background: #1a1a2a;
-  color: #a78bfa;
-  border: 1px solid #3a3a5a;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
-.btn--sync-dir:hover { background: #2a2a4a; border-color: #6d28d9; }
 
 /* ===== Global Settings Panel ===== */
 .global-settings {
@@ -191,33 +194,55 @@ body {
 }
 .btn--ft:hover { background: #2a2a4a; border-color: #6d28d9; }
 
-/* ===== Stage (main area) ===== */
+/* ===== Stage (main area) — CSS Grid ===== */
 .stage {
   flex: 1;
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  gap: 4px;
+  background: #2a2a3a;   /* gap の色 = 仕切り線 */
   overflow: hidden;
   min-height: 0;
 }
 
-.stage.layout-vertical { flex-direction: column; }
+/* 1 パネル */
+.stage.lp1   { grid-template-columns: 1fr; }
 
-/* ===== Divider ===== */
-.divider {
-  width: 4px;
-  background: #2a2a3a;
-  flex-shrink: 0;
+/* 2 パネル */
+.stage.lp2-h { grid-template-columns: 1fr 1fr; }
+.stage.lp2-v { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+
+/* 3 パネル */
+.stage.lp3-h { grid-template-columns: 1fr 1fr 1fr; }
+.stage.lp3-v { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr 1fr; }
+.stage.lp3-l {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
 }
-.stage.layout-vertical .divider { width: 100%; height: 4px; }
+.stage.lp3-l .panel:nth-child(1) { grid-column: 1; grid-row: 1 / 3; }
+.stage.lp3-l .panel:nth-child(2) { grid-column: 2; grid-row: 1; }
+.stage.lp3-l .panel:nth-child(3) { grid-column: 2; grid-row: 2; }
+
+.stage.lp3-r {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.stage.lp3-r .panel:nth-child(1) { grid-column: 1; grid-row: 1; }
+.stage.lp3-r .panel:nth-child(2) { grid-column: 1; grid-row: 2; }
+.stage.lp3-r .panel:nth-child(3) { grid-column: 2; grid-row: 1 / 3; }
+
+/* 4 パネル */
+.stage.lp4-g { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.stage.lp4-h { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.stage.lp4-v { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr 1fr 1fr; }
 
 /* ===== Panel ===== */
 .panel {
-  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
   min-height: 0;
+  background: #0f0f13;
 }
 
 /* ===== Config Strip ===== */
@@ -253,7 +278,6 @@ body {
 .input--url  { flex: 1; min-width: 100px; }
 .input--time { width: 100px; }
 .input--sm   { width: 110px; }
-.input--apikey { flex: 1; min-width: 120px; }
 
 .config-label { font-size: 12px; color: #9ca3af; white-space: nowrap; }
 .hint { font-size: 11px; color: #6b7280; }
@@ -297,7 +321,7 @@ body {
   flex-shrink: 0;
 }
 
-/* ===== Responsive: モバイル (Android Firefox 等) ===== */
+/* ===== Responsive: モバイル ===== */
 @media (max-width: 640px) {
   .topbar {
     height: auto;
@@ -305,13 +329,18 @@ body {
     flex-wrap: wrap;
   }
 
-  /* モバイルでは縦積みを強制 */
-  .stage { flex-direction: column !important; }
-  .divider { width: 100% !important; height: 4px !important; }
+  /* モバイルでは常に縦1列 */
+  .stage {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: unset !important;
+  }
+  .stage .panel {
+    grid-column: unset !important;
+    grid-row: unset !important;
+  }
 
   .panel-config { padding: 6px 10px; gap: 5px; }
 
-  /* タッチ操作向け: 入力サイズを拡大（iOS の自動ズーム防止も兼ねる） */
   .input { font-size: 16px; padding: 7px 10px; }
   .input--time { width: 120px; }
 
@@ -320,7 +349,6 @@ body {
   .btn--chat { min-height: 40px; }
   .btn--fetch { padding: 8px 10px; min-height: 40px; }
 
-  /* 微調整ボタンを横2列グリッドに */
   .finetune-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -329,15 +357,10 @@ body {
   }
   .btn--ft { padding: 7px 8px; font-size: 12px; min-height: 36px; text-align: center; }
 
-  /* 配信開始行は2行に分ける */
-  .config-row:has(#start-0),
-  .config-row:has(#start-1) { flex-wrap: wrap; }
-
   .settings-grid { grid-template-columns: 1fr; }
   .hint { display: none; }
 }
 
-/* ===== fine-tune group のモバイル折り返し補助 ===== */
 @media (max-width: 480px) {
   .plat-btn { padding: 4px 7px; font-size: 10px; }
 }
