@@ -32,24 +32,15 @@
       margin-bottom: 10px;
     }
 
-    h1 {
-      font-size: 16px;
-      font-weight: 700;
-      color: #a78bfa;
-      letter-spacing: 0.02em;
-    }
+    h1 { font-size: 16px; font-weight: 700; color: #a78bfa; letter-spacing: 0.02em; }
 
-    #api-status {
-      font-size: 11px;
-      color: #6b7280;
-    }
+    #api-status { font-size: 11px; color: #6b7280; }
     #api-status.ok  { color: #4ade80; }
     #api-status.err { color: #f87171; }
 
     /* ===== Platform tabs ===== */
     .platform-tabs {
       display: flex;
-      gap: 0;
       margin-bottom: 10px;
       border-radius: 7px;
       overflow: hidden;
@@ -61,8 +52,7 @@
       padding: 6px 20px;
       background: transparent;
       border: none;
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 13px; font-weight: 700;
       color: #6b7280;
       cursor: pointer;
       transition: all 0.12s;
@@ -72,11 +62,7 @@
     .platform-tab[data-ptab="twitch"].is-active  { background: #6441a5; color: #fff; }
 
     /* ===== Search row ===== */
-    .search-row {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
+    .search-row { display: flex; gap: 6px; align-items: center; }
 
     .search-input {
       flex: 1;
@@ -89,149 +75,86 @@
       transition: border-color 0.12s;
     }
     .search-input:focus { outline: none; }
-    #q:focus          { border-color: #cc0000; }
-    #tw-filter:focus  { border-color: #6441a5; }
+    #q:focus         { border-color: #cc0000; }
+    #tw-filter:focus { border-color: #6441a5; }
+    #tw-vod-url:focus { border-color: #6441a5; }
 
-    .btn-search-yt {
-      background: #cc0000;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
+    .btn-yt-search {
+      background: #cc0000; color: #fff;
+      border: none; border-radius: 6px;
       padding: 8px 18px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
       transition: background 0.12s;
     }
-    .btn-search-yt:hover:not(:disabled) { background: #aa0000; }
-    .btn-search-yt:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-yt-search:hover:not(:disabled) { background: #aa0000; }
+    .btn-yt-search:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* ===== Channel filter chips (YouTube) ===== */
-    .chip-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 10px;
-    }
+    .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 
     .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
+      display: inline-flex; align-items: center; gap: 5px;
       padding: 4px 12px;
-      background: #1a1a2a;
-      border: 1px solid #3a3a5a;
-      border-radius: 20px;
-      font-size: 12px;
-      color: #9ca3af;
-      cursor: pointer;
-      transition: all 0.12s;
-      white-space: nowrap;
+      background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 20px;
+      font-size: 12px; color: #9ca3af;
+      cursor: pointer; transition: all 0.12s; white-space: nowrap;
     }
     .chip:hover { background: #2a2a3a; color: #e0e0e0; }
     .chip.is-active { background: #2a0a0a; border-color: #cc0000; color: #fca5a5; }
     .chip-all.is-active { background: #0a2a0a; border-color: #16a34a; color: #86efac; }
 
-    .chip-avatar {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
+    .chip-avatar { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; }
 
     /* ===== Video type filter row (YouTube) ===== */
     .filter-row {
-      display: flex;
-      gap: 5px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-top: 8px;
-      padding-top: 8px;
+      display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+      margin-top: 8px; padding-top: 8px;
       border-top: 1px solid #1e1e2a;
     }
 
-    .filter-label {
-      font-size: 11px;
-      color: #4b5563;
-      white-space: nowrap;
-      margin-right: 2px;
-    }
+    .filter-label { font-size: 11px; color: #4b5563; white-space: nowrap; margin-right: 2px; }
 
     .filter-btn {
       padding: 3px 11px;
-      background: #1a1a2a;
-      border: 1px solid #3a3a5a;
-      border-radius: 5px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #6b7280;
-      cursor: pointer;
-      transition: all 0.12s;
-      white-space: nowrap;
+      background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 5px;
+      font-size: 12px; font-weight: 600; color: #6b7280;
+      cursor: pointer; transition: all 0.12s; white-space: nowrap;
     }
     .filter-btn:hover { background: #2a2a3a; color: #c4b5fd; border-color: #4a4a6a; }
-    .filter-btn.is-active                      { background: #1e1a3a; border-color: #7c3aed; color: #c4b5fd; }
-    .filter-btn[data-filter="live"].is-active  { background: #2a0a0a; border-color: #dc2626; color: #fca5a5; }
-    .filter-btn[data-filter="short"].is-active { background: #0a1a2a; border-color: #2563eb; color: #93c5fd; }
+    .filter-btn.is-active                        { background: #1e1a3a; border-color: #7c3aed; color: #c4b5fd; }
+    .filter-btn[data-filter="live"].is-active    { background: #2a0a0a; border-color: #dc2626; color: #fca5a5; }
+    .filter-btn[data-filter="short"].is-active   { background: #0a1a2a; border-color: #2563eb; color: #93c5fd; }
 
     /* ===== Twitch header note ===== */
     .tw-note {
-      margin-top: 8px;
-      padding-top: 8px;
+      margin-top: 8px; padding-top: 8px;
       border-top: 1px solid #1e1e2a;
-      font-size: 11px;
-      color: #4b5563;
-      line-height: 1.6;
+      font-size: 11px; color: #4b5563; line-height: 1.6;
     }
 
     /* ===== Main content ===== */
-    main {
-      padding: 16px;
-      max-width: 960px;
-      margin: 0 auto;
-    }
+    main { padding: 16px; max-width: 960px; margin: 0 auto; }
 
     .hint-text {
-      color: #4b5563;
-      font-size: 13px;
-      padding: 40px 0;
-      text-align: center;
-      line-height: 1.8;
+      color: #4b5563; font-size: 13px;
+      padding: 40px 0; text-align: center; line-height: 1.8;
     }
 
     .api-warning {
-      background: #1a1500;
-      border: 1px solid #854d0e;
-      border-radius: 8px;
-      padding: 16px 20px;
-      color: #fde68a;
-      font-size: 13px;
-      line-height: 1.8;
-      margin-bottom: 16px;
+      background: #1a1500; border: 1px solid #854d0e; border-radius: 8px;
+      padding: 16px 20px; color: #fde68a; font-size: 13px; line-height: 1.8; margin-bottom: 16px;
     }
     .api-warning code {
-      background: #2a2500;
-      border: 1px solid #854d0e;
-      border-radius: 3px;
-      padding: 1px 5px;
-      font-size: 12px;
+      background: #2a2500; border: 1px solid #854d0e;
+      border-radius: 3px; padding: 1px 5px; font-size: 12px;
     }
 
-    .loading-text {
-      text-align: center;
-      padding: 40px;
-      color: #4b5563;
-      font-size: 13px;
-    }
+    .loading-text { text-align: center; padding: 40px; color: #4b5563; font-size: 13px; }
 
     .error-text {
-      background: #1a0a0a;
-      border: 1px solid #7f1d1d;
-      border-radius: 8px;
-      padding: 14px 18px;
-      color: #fca5a5;
-      font-size: 13px;
+      background: #1a0a0a; border: 1px solid #7f1d1d; border-radius: 8px;
+      padding: 14px 18px; color: #fca5a5; font-size: 13px;
     }
 
     /* ===== YouTube video grid ===== */
@@ -240,72 +163,36 @@
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 12px;
     }
-
-    .video-grid.is-shorts {
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    }
+    .video-grid.is-shorts { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
     .video-grid.is-shorts .video-thumb { aspect-ratio: 9 / 16; }
 
     .video-card {
-      background: #1a1a2a;
-      border: 1px solid #2a2a3a;
-      border-radius: 8px;
-      overflow: hidden;
+      display: flex; flex-direction: column;
+      background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 8px; overflow: hidden;
       transition: border-color 0.12s, box-shadow 0.12s;
     }
     .video-card:hover { border-color: #cc0000; box-shadow: 0 0 0 1px #cc000033; }
 
     .video-thumb {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      background: #0a0a10;
-      overflow: hidden;
+      position: relative; width: 100%; aspect-ratio: 16 / 9;
+      background: #0a0a10; overflow: hidden; flex-shrink: 0;
     }
-    .video-thumb img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
+    .video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-    .live-badge {
-      position: absolute;
-      top: 6px; left: 6px;
-      background: #dc2626;
-      color: #fff;
-      font-size: 10px; font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 3px;
-      letter-spacing: 0.05em;
+    .live-badge, .shorts-badge {
+      position: absolute; top: 6px; left: 6px;
+      color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px;
     }
+    .live-badge   { background: #dc2626; letter-spacing: 0.05em; }
+    .shorts-badge { background: #2563eb; }
 
-    .shorts-badge {
-      position: absolute;
-      top: 6px; left: 6px;
-      background: #2563eb;
-      color: #fff;
-      font-size: 10px; font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 3px;
-    }
-
-    .video-info { padding: 10px 10px 6px; }
+    .video-info { padding: 10px 10px 6px; flex: 1; }
     .video-title {
-      font-size: 13px; font-weight: 600;
-      color: #e0e0e0;
-      line-height: 1.4;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      margin-bottom: 4px;
+      font-size: 13px; font-weight: 600; color: #e0e0e0; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; margin-bottom: 4px;
     }
-    .video-meta {
-      font-size: 11px;
-      color: #6b7280;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    .video-meta { font-size: 11px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* ===== Twitch channel grid ===== */
     .tw-grid {
@@ -315,128 +202,100 @@
     }
 
     .tw-card {
-      background: #1a1a2a;
-      border: 1px solid #2a2a3a;
-      border-radius: 8px;
-      padding: 12px;
+      background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 8px; padding: 12px;
       transition: border-color 0.12s;
     }
     .tw-card:hover { border-color: #6441a5; }
 
-    .tw-card-inner {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
+    .tw-card-inner { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 
     .tw-avatar {
-      width: 40px; height: 40px;
-      border-radius: 50%;
+      width: 40px; height: 40px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 17px; font-weight: 700; color: #fff;
-      flex-shrink: 0;
+      font-size: 17px; font-weight: 700; color: #fff; flex-shrink: 0;
     }
 
-    .tw-name {
-      font-size: 13px; font-weight: 600;
-      color: #e0e0e0;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    .tw-name { font-size: 13px; font-weight: 600; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tw-platform { font-size: 11px; color: #6441a5; margin-top: 2px; }
 
-    .tw-actions { display: flex; flex-direction: column; gap: 5px; }
-    .tw-panel-row { display: flex; gap: 4px; align-items: center; }
+    .tw-actions { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
 
     .btn-vod {
       display: inline-block;
-      padding: 3px 10px;
-      font-size: 11px; font-weight: 700;
-      background: #1a102a;
-      color: #a78bfa;
-      border: 1px solid #6441a5;
-      border-radius: 4px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background 0.1s;
-      text-align: center;
+      padding: 3px 10px; font-size: 11px; font-weight: 700;
+      background: #1a102a; color: #a78bfa;
+      border: 1px solid #6441a5; border-radius: 4px;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.1s; white-space: nowrap;
     }
     .btn-vod:hover { background: #6441a5; color: #fff; }
 
+    /* ===== Twitch VOD section ===== */
+    .tw-vod-box {
+      background: #13132a;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tw-section-label {
+      font-size: 11px; font-weight: 700;
+      color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    .tw-vod-panel-row { display: flex; gap: 4px; align-items: center; }
+
+    .tw-vod-hint { font-size: 11px; color: #374151; line-height: 1.5; }
+
+    .tw-favorites-label {
+      font-size: 11px; font-weight: 700;
+      color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
     /* ===== Panel buttons (shared) ===== */
     .video-panel-row {
-      display: flex;
-      gap: 5px;
-      padding: 6px 10px 10px;
-      align-items: center;
+      display: flex; gap: 5px; padding: 6px 10px 10px; align-items: center;
     }
 
-    .panel-label {
-      font-size: 11px;
-      color: #4b5563;
-      margin-right: 2px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
+    .panel-label { font-size: 11px; color: #4b5563; margin-right: 2px; white-space: nowrap; flex-shrink: 0; }
 
     .btn-panel {
-      padding: 4px 11px;
-      font-size: 12px; font-weight: 700;
-      background: #1e3a5f;
-      color: #93c5fd;
-      border: 1px solid #2563eb;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.1s;
-      flex-shrink: 0;
+      padding: 4px 11px; font-size: 12px; font-weight: 700;
+      background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb; border-radius: 4px;
+      cursor: pointer; transition: background 0.1s; flex-shrink: 0;
     }
     .btn-panel:hover { background: #2563eb; color: #fff; }
 
     /* ===== Pagination (YouTube) ===== */
     .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 20px 0 8px;
+      display: flex; align-items: center; justify-content: center;
+      gap: 12px; padding: 20px 0 8px;
     }
 
     .btn-page {
-      padding: 7px 18px;
-      font-size: 13px; font-weight: 600;
-      background: #1a1a2a;
-      color: #c4b5fd;
-      border: 1px solid #3a3a5a;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background 0.12s;
+      padding: 7px 18px; font-size: 13px; font-weight: 600;
+      background: #1a1a2a; color: #c4b5fd; border: 1px solid #3a3a5a; border-radius: 6px;
+      cursor: pointer; transition: background 0.12s;
     }
     .btn-page:hover:not(:disabled) { background: #2a2a4a; border-color: #7c3aed; }
     .btn-page:disabled { opacity: 0.3; cursor: not-allowed; }
 
-    .page-num {
-      font-size: 12px;
-      color: #6b7280;
-      min-width: 60px;
-      text-align: center;
-    }
+    .page-num { font-size: 12px; color: #6b7280; min-width: 60px; text-align: center; }
 
     /* ===== Toast ===== */
     #toast {
-      position: fixed;
-      bottom: 20px; left: 50%;
-      transform: translateX(-50%);
-      background: #0a2a0a;
-      border: 1px solid #16a34a;
-      color: #86efac;
-      padding: 10px 22px;
-      border-radius: 8px;
-      font-size: 13px; font-weight: 600;
-      z-index: 1000;
-      pointer-events: none;
-      white-space: nowrap;
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #0a2a0a; border: 1px solid #16a34a; color: #86efac;
+      padding: 10px 22px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      z-index: 1000; pointer-events: none; white-space: nowrap;
       box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
+    #toast.is-warn { background: #2a1500; border-color: #92400e; color: #fde68a; }
 
     /* ===== Responsive ===== */
     @media (max-width: 560px) {
@@ -465,12 +324,13 @@
     <div id="yt-header-controls">
       <div class="search-row">
         <input type="text" id="q" class="search-input" placeholder="キーワードを入力…" autocomplete="off">
-        <button class="btn-search-yt" id="btn-search">検索</button>
+        <button class="btn-yt-search" id="btn-search">検索</button>
       </div>
       <div class="chip-row" id="chip-row"></div>
+      <!-- YouTube のタブ分類に準拠: 動画 / ライブ中 / アーカイブ / ショート -->
       <div class="filter-row">
         <span class="filter-label">絞り込み:</span>
-        <button class="filter-btn" data-filter="all">すべて</button>
+        <button class="filter-btn" data-filter="video">動画</button>
         <button class="filter-btn is-active" data-filter="live">🔴 ライブ中</button>
         <button class="filter-btn" data-filter="archive">📼 アーカイブ</button>
         <button class="filter-btn" data-filter="short">▶ ショート</button>
@@ -481,17 +341,17 @@
     <div id="tw-header-controls" hidden>
       <div class="search-row">
         <input type="text" id="tw-filter" class="search-input"
-               placeholder="お気に入りチャンネルを絞り込み…" autocomplete="off">
+               placeholder="チャンネル名で絞り込み…" autocomplete="off">
       </div>
       <p class="tw-note">
-        ライブ確認が必要な場合は Twitch.tv を開いてください。<br>
-        P1〜P4 ボタンでチャンネルをパネルに読み込みます。
+        ライブ確認が必要な場合は Twitch.tv を確認してください。<br>
+        P1〜P4 でライブをパネルに読み込み、VOD URL 入力で録画を送れます。
       </p>
     </div>
   </header>
 
   <main>
-    <!-- YouTube pane -->
+    <!-- ===== YouTube pane ===== -->
     <div id="yt-pane">
       <div id="results"></div>
       <div class="pagination" id="pagination" hidden>
@@ -500,8 +360,30 @@
         <button class="btn-page" id="btn-next" disabled>次へ →</button>
       </div>
     </div>
-    <!-- Twitch pane -->
+
+    <!-- ===== Twitch pane ===== -->
     <div id="tw-pane" hidden>
+
+      <!-- VOD URL 直接入力 -->
+      <div class="tw-vod-box">
+        <div class="tw-section-label">VOD を開く</div>
+        <input type="text" id="tw-vod-url" class="search-input"
+               placeholder="https://www.twitch.tv/videos/…  または  動画ID"
+               autocomplete="off">
+        <div class="tw-vod-panel-row">
+          <span class="panel-label">パネルへ→</span>
+          <button class="btn-panel" data-vod-panel="0">P1</button>
+          <button class="btn-panel" data-vod-panel="1">P2</button>
+          <button class="btn-panel" data-vod-panel="2">P3</button>
+          <button class="btn-panel" data-vod-panel="3">P4</button>
+        </div>
+        <p class="tw-vod-hint">
+          チャンネルの「VOD ↗」で Twitch の動画ページを開き、目的の VOD の URL をコピーして上の欄に貼り付けてください。
+        </p>
+      </div>
+
+      <!-- お気に入りチャンネル -->
+      <div class="tw-favorites-label">お気に入りチャンネル</div>
       <div id="tw-results"></div>
     </div>
   </main>
@@ -513,23 +395,24 @@
     const FAV_KEY      = 'multi-stream-sync-favorites';
     const BC_NAME      = 'mss-picker';
     const PANEL_COUNT  = 4;
+    const MAX_RESULTS  = 20;
 
-    let apiKey       = '';
-    let ytFavorites  = [];
-    let twFavorites  = [];
+    let apiKey      = '';
+    let ytFavorites = [];
+    let twFavorites = [];
 
-    // ===== Tab state =====
+    // ===== State =====
     let activePtab      = 'youtube';
     let activeChannelId = null;
-    let activeFilter    = 'live';
+    let activeFilter    = 'live'; // 'video' | 'live' | 'archive' | 'short'
 
-    // ===== Pagination state =====
-    let pageHistory   = [];
-    let currentToken  = null;
-    let nextPageToken = null;
+    // Pagination
+    let pageHistory   = [];   // tokens that were used to reach each page (for going back)
+    let currentToken  = null; // token used to load the currently displayed page
+    let nextPageToken = null; // token for the next page (from API response)
     let currentPage   = 1;
 
-    // ===== Load from localStorage =====
+    // ===== Load localStorage =====
 
     function loadStorage() {
       try {
@@ -562,20 +445,19 @@
 
     function switchTab(ptab) {
       activePtab = ptab;
-      document.querySelectorAll('.platform-tab').forEach(btn => {
-        btn.classList.toggle('is-active', btn.dataset.ptab === ptab);
-      });
+      document.querySelectorAll('.platform-tab').forEach(btn =>
+        btn.classList.toggle('is-active', btn.dataset.ptab === ptab)
+      );
       document.getElementById('yt-header-controls').hidden = (ptab !== 'youtube');
       document.getElementById('tw-header-controls').hidden = (ptab !== 'twitch');
       document.getElementById('yt-pane').hidden = (ptab !== 'youtube');
       document.getElementById('tw-pane').hidden = (ptab !== 'twitch');
-
       if (ptab === 'twitch') renderTwitchFavorites();
     }
 
-    document.querySelectorAll('.platform-tab').forEach(btn => {
-      btn.addEventListener('click', () => switchTab(btn.dataset.ptab));
-    });
+    document.querySelectorAll('.platform-tab').forEach(btn =>
+      btn.addEventListener('click', () => switchTab(btn.dataset.ptab))
+    );
 
     // ===== YouTube channel chips =====
 
@@ -648,7 +530,6 @@
       grid.className = 'tw-grid';
 
       for (const ch of channels) {
-        const initial = ch.username[0].toUpperCase();
         const panelBtns = Array.from({ length: PANEL_COUNT }, (_, pi) =>
           `<button class="btn-panel" data-tw-user="${escHtml(ch.username)}" data-panel="${pi}">P${pi + 1}</button>`
         ).join('');
@@ -657,22 +538,19 @@
         card.className = 'tw-card';
         card.innerHTML = `
           <div class="tw-card-inner">
-            <div class="tw-avatar" style="background:#6441a5">${escHtml(initial)}</div>
-            <div class="tw-info">
+            <div class="tw-avatar" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>
+            <div>
               <div class="tw-name">${escHtml(ch.username)}</div>
               <div class="tw-platform">Twitch</div>
             </div>
           </div>
           <div class="tw-actions">
-            <div class="tw-panel-row">
-              <span class="panel-label">開く→</span>
-              ${panelBtns}
-            </div>
+            <span class="panel-label">開く→</span>
+            ${panelBtns}
             <a class="btn-vod"
                href="https://www.twitch.tv/${escHtml(ch.username)}/videos"
                target="_blank" rel="noopener noreferrer">VOD ↗</a>
           </div>`;
-
         grid.appendChild(card);
       }
 
@@ -682,12 +560,45 @@
 
     document.getElementById('tw-filter').addEventListener('input', renderTwitchFavorites);
 
-    // Twitch panel button clicks
+    // Twitch ライブ: channel panel buttons (event delegation)
     document.getElementById('tw-results').addEventListener('click', e => {
       const btn = e.target.closest('.btn-panel[data-tw-user]');
       if (!btn) return;
       sendToPanel(btn.dataset.twUser, Number(btn.dataset.panel), 'twitch');
     });
+
+    // Twitch VOD: URL input → parse → send
+    document.getElementById('tw-pane').addEventListener('click', e => {
+      const btn = e.target.closest('.btn-panel[data-vod-panel]');
+      if (!btn) return;
+
+      const raw = document.getElementById('tw-vod-url').value.trim();
+      if (!raw) { showToast('VOD URL または動画 ID を入力してください', 'warn'); return; }
+
+      const vodUrl = normalizeTwitchVodUrl(raw);
+      if (!vodUrl) { showToast('有効な Twitch VOD URL を入力してください', 'warn'); return; }
+
+      sendToPanel(vodUrl, Number(btn.dataset.vodPanel), 'twitch');
+    });
+
+    // Twitch VOD URL の正規化（https://www.twitch.tv/videos/XXXXXXXX の形式に統一）
+    function normalizeTwitchVodUrl(input) {
+      const trimmed = input.trim();
+      try {
+        const u = new URL(trimmed);
+        if (u.hostname.includes('twitch.tv')) {
+          const parts = u.pathname.split('/').filter(Boolean);
+          if (parts[0] === 'videos' && /^\d+$/.test(parts[1])) {
+            return `https://www.twitch.tv/videos/${parts[1]}`;
+          }
+        }
+      } catch {}
+      // 数字のみ → 動画 ID として扱う
+      if (/^\d{6,}$/.test(trimmed)) {
+        return `https://www.twitch.tv/videos/${trimmed}`;
+      }
+      return null;
+    }
 
     // ===== Utilities =====
 
@@ -737,9 +648,10 @@
 
       const q = document.getElementById('q').value.trim();
 
-      if (activeFilter === 'short' && !q && !activeChannelId) {
+      // 動画・ショートはチャンネルかキーワードが必要
+      if ((activeFilter === 'video' || activeFilter === 'short') && !q && !activeChannelId) {
         document.getElementById('results').innerHTML =
-          '<p class="hint-text">ショートを絞り込むにはキーワードを入力するか、チャンネルを選んでください</p>';
+          '<p class="hint-text">キーワードを入力するか、チャンネルチップを選んでください</p>';
         document.getElementById('pagination').hidden = true;
         return;
       }
@@ -754,30 +666,41 @@
         const url = new URL('https://www.googleapis.com/youtube/v3/search');
         url.searchParams.set('part',       'snippet');
         url.searchParams.set('type',       'video');
-        url.searchParams.set('maxResults', '20');
+        url.searchParams.set('maxResults', String(MAX_RESULTS));
         url.searchParams.set('key',        apiKey);
 
+        // ページトークン（2ページ目以降）
         if (pageToken) url.searchParams.set('pageToken', pageToken);
 
+        // チャンネルチップ選択: そのチャンネルを date 順（新しい順）で取得
+        // → ページ送りで順に古い動画を取得できる
         if (activeChannelId) {
           url.searchParams.set('channelId', activeChannelId);
-          url.searchParams.set('order', 'date');
+          url.searchParams.set('order',     'date');
           if (q) url.searchParams.set('q', q);
         } else if (q) {
           url.searchParams.set('q',     q);
           url.searchParams.set('order', 'relevance');
+        } else {
+          // ライブ中・アーカイブのグローバル検索
+          url.searchParams.set('order', 'viewCount');
         }
 
+        // 絞り込みフィルター（YouTube タブ分類準拠）
         switch (activeFilter) {
+          case 'video':
+            // eventType なし → 通常動画（YouTube の「動画」タブ相当）
+            break;
           case 'live':
+            // 現在配信中（YouTube の「ライブ」タブ）
             url.searchParams.set('eventType', 'live');
-            if (!activeChannelId && !q) url.searchParams.set('q', ' ');
             break;
           case 'archive':
+            // 配信済みアーカイブ（YouTube の「ライブ」タブ内のアーカイブ）
             url.searchParams.set('eventType', 'completed');
-            if (!activeChannelId && !q) url.searchParams.set('q', ' ');
             break;
           case 'short':
+            // 4分以内の動画（ショート相当）
             url.searchParams.set('videoDuration', 'short');
             break;
         }
@@ -803,6 +726,8 @@
         btn.textContent = '検索';
       }
     }
+
+    // ===== YouTube result rendering =====
 
     function renderResults(items) {
       const container = document.getElementById('results');
@@ -847,7 +772,6 @@
             <span class="panel-label">開く→</span>
             ${panelBtns}
           </div>`;
-
         grid.appendChild(card);
       }
 
@@ -867,9 +791,10 @@
     // ===== Toast =====
 
     let toastTimer = null;
-    function showToast(msg) {
+    function showToast(msg, type = 'ok') {
       const el = document.getElementById('toast');
       el.textContent = msg;
+      el.className   = type === 'warn' ? 'is-warn' : '';
       el.hidden = false;
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => { el.hidden = true; }, 2500);
@@ -879,7 +804,7 @@
 
     document.getElementById('btn-next').addEventListener('click', () => {
       if (!nextPageToken) return;
-      pageHistory.push(currentToken);
+      pageHistory.push(currentToken); // 現在のページのトークンを履歴に積む
       currentPage++;
       doSearch(nextPageToken);
     });
@@ -898,6 +823,7 @@
       if (e.key === 'Enter') resetAndSearch();
     });
 
+    // YouTube 動画パネルボタン（イベント委譲）
     document.getElementById('results').addEventListener('click', e => {
       const btn = e.target.closest('.btn-panel[data-video-id]');
       if (!btn) return;
@@ -909,7 +835,7 @@
     loadStorage();
     initBC();
 
-    // Determine initial tab from URL param (?tab=twitch)
+    // URL パラメータでタブを決定（?tab=twitch で Twitch タブを開く）
     const initTab = new URLSearchParams(location.search).get('tab') || 'youtube';
     switchTab(initTab);
     renderChips();
@@ -918,6 +844,7 @@
     if (apiKey) {
       statusEl.textContent = '✓ API Key あり';
       statusEl.className = 'ok';
+      // YouTube タブ初期表示時: ライブ中を自動検索
       if (initTab === 'youtube') doSearch(null);
     } else {
       statusEl.textContent = '⚠ API Key 未設定';
