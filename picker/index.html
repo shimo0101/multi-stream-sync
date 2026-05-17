@@ -112,6 +112,41 @@
       object-fit: cover;
     }
 
+    /* ===== Video type filter row ===== */
+    .filter-row {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #1e1e2a;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      color: #4b5563;
+      white-space: nowrap;
+      margin-right: 2px;
+    }
+
+    .filter-btn {
+      padding: 3px 11px;
+      background: #1a1a2a;
+      border: 1px solid #3a3a5a;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.12s;
+      white-space: nowrap;
+    }
+    .filter-btn:hover { background: #2a2a3a; color: #c4b5fd; border-color: #4a4a6a; }
+    .filter-btn.is-active                      { background: #1e1a3a; border-color: #7c3aed; color: #c4b5fd; }
+    .filter-btn[data-filter="live"].is-active  { background: #2a0a0a; border-color: #dc2626; color: #fca5a5; }
+    .filter-btn[data-filter="short"].is-active { background: #0a1a2a; border-color: #2563eb; color: #93c5fd; }
+
     /* ===== Main content ===== */
     main {
       padding: 16px;
@@ -168,6 +203,12 @@
       gap: 12px;
     }
 
+    /* Shorts: narrow cards with vertical thumbnails */
+    .video-grid.is-shorts {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+    .video-grid.is-shorts .video-thumb { aspect-ratio: 9 / 16; }
+
     .video-card {
       background: #1a1a2a;
       border: 1px solid #2a2a3a;
@@ -204,9 +245,19 @@
       letter-spacing: 0.05em;
     }
 
-    .video-info {
-      padding: 10px 10px 6px;
+    .shorts-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
     }
+
+    .video-info { padding: 10px 10px 6px; }
     .video-title {
       font-size: 13px;
       font-weight: 600;
@@ -256,6 +307,36 @@
     }
     .btn-panel:hover { background: #2563eb; color: #fff; }
 
+    /* ===== Pagination ===== */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 20px 0 8px;
+    }
+
+    .btn-page {
+      padding: 7px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #1a1a2a;
+      color: #c4b5fd;
+      border: 1px solid #3a3a5a;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .btn-page:hover:not(:disabled) { background: #2a2a4a; border-color: #7c3aed; }
+    .btn-page:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .page-num {
+      font-size: 12px;
+      color: #6b7280;
+      min-width: 60px;
+      text-align: center;
+    }
+
     /* ===== Toast ===== */
     #toast {
       position: fixed;
@@ -278,6 +359,7 @@
     /* ===== Responsive ===== */
     @media (max-width: 560px) {
       .video-grid { grid-template-columns: 1fr; }
+      .video-grid.is-shorts { grid-template-columns: 1fr 1fr; }
       h1 { font-size: 14px; }
     }
   </style>
@@ -293,11 +375,25 @@
       <input type="text" id="q" placeholder="キーワードを入力…" autocomplete="off">
       <button id="btn-search">検索</button>
     </div>
+    <!-- Channel filter chips -->
     <div class="chip-row" id="chip-row"></div>
+    <!-- Video type filter -->
+    <div class="filter-row">
+      <span class="filter-label">絞り込み:</span>
+      <button class="filter-btn" data-filter="all">すべて</button>
+      <button class="filter-btn is-active" data-filter="live">🔴 ライブ中</button>
+      <button class="filter-btn" data-filter="archive">📼 アーカイブ</button>
+      <button class="filter-btn" data-filter="short">▶ ショート</button>
+    </div>
   </header>
 
   <main>
     <div id="results"></div>
+    <div class="pagination" id="pagination" hidden>
+      <button class="btn-page" id="btn-prev" disabled>← 前へ</button>
+      <span class="page-num" id="page-num">1 ページ</span>
+      <button class="btn-page" id="btn-next" disabled>次へ →</button>
+    </div>
   </main>
 
   <div id="toast" hidden></div>
@@ -308,9 +404,18 @@
     const BC_NAME      = 'mss-picker';
     const PANEL_COUNT  = 4;
 
-    let apiKey    = '';
-    let favorites = [];
-    let activeChannelId = null; // null = all
+    let apiKey          = '';
+    let favorites       = [];
+    let activeChannelId = null;    // null = すべてのチャンネル
+    let activeFilter    = 'live';  // デフォルト: ライブ中
+
+    // ===== Pagination state =====
+    // pageHistory[i] = pageToken that was used to load page (i+1)
+    // null means "first page" (no token)
+    let pageHistory    = [];   // tokens used to reach past pages
+    let currentToken   = null; // token used to load the currently displayed page
+    let nextPageToken  = null; // token for the next page (from API response)
+    let currentPage    = 1;
 
     // ===== Load from localStorage =====
 
@@ -339,7 +444,7 @@
       showToast(`P${panelIdx + 1} に送信しました — "${videoId}"`);
     }
 
-    // ===== Chip rendering =====
+    // ===== Channel chips =====
 
     function renderChips() {
       const row = document.getElementById('chip-row');
@@ -349,15 +454,16 @@
       allBtn.className = 'chip chip-all' + (activeChannelId === null ? ' is-active' : '');
       allBtn.textContent = 'すべて';
       allBtn.addEventListener('click', () => {
+        if (activeChannelId === null) return;
         activeChannelId = null;
         renderChips();
+        resetAndSearch();
       });
       row.appendChild(allBtn);
 
       for (const ch of favorites) {
         const btn = document.createElement('button');
         btn.className = 'chip' + (activeChannelId === ch.channelId ? ' is-active' : '');
-
         if (ch.thumbnailUrl) {
           const img = document.createElement('img');
           img.className = 'chip-avatar';
@@ -367,21 +473,34 @@
         }
         btn.appendChild(document.createTextNode(ch.name));
         btn.addEventListener('click', () => {
+          if (activeChannelId === ch.channelId) return;
           activeChannelId = ch.channelId;
           renderChips();
-          doSearch();
+          resetAndSearch();
         });
         row.appendChild(btn);
       }
     }
 
+    // ===== Filter buttons =====
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.filter === activeFilter) return;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        activeFilter = btn.dataset.filter;
+        resetAndSearch();
+      });
+    });
+
     // ===== Utilities =====
 
     function relativeTime(isoStr) {
       const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
-      if (diff < 60)    return `${diff}秒前`;
-      if (diff < 3600)  return `${Math.floor(diff / 60)}分前`;
-      if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
+      if (diff < 60)      return `${diff}秒前`;
+      if (diff < 3600)    return `${Math.floor(diff / 60)}分前`;
+      if (diff < 86400)   return `${Math.floor(diff / 3600)}時間前`;
       if (diff < 2592000) return `${Math.floor(diff / 86400)}日前`;
       return `${Math.floor(diff / 2592000)}ヶ月前`;
     }
@@ -392,20 +511,50 @@
       );
     }
 
+    // ===== Pagination helpers =====
+
+    function resetPagination() {
+      pageHistory   = [];
+      currentToken  = null;
+      nextPageToken = null;
+      currentPage   = 1;
+    }
+
+    function updatePaginationUI() {
+      const pag     = document.getElementById('pagination');
+      const hasPrev = pageHistory.length > 0;
+      const hasNext = nextPageToken !== null;
+      pag.hidden = !hasPrev && !hasNext;
+      document.getElementById('btn-prev').disabled = !hasPrev;
+      document.getElementById('btn-next').disabled = !hasNext;
+      document.getElementById('page-num').textContent = `${currentPage} ページ`;
+    }
+
+    function resetAndSearch() {
+      resetPagination();
+      doSearch(null);
+    }
+
     // ===== API search =====
 
-    async function doSearch() {
-      if (!apiKey) {
-        showApiWarning();
+    async function doSearch(pageToken) {
+      if (!apiKey) { showApiWarning(); return; }
+
+      const q = document.getElementById('q').value.trim();
+
+      // ショート絞り込み時はキーワードかチャンネル指定が必要
+      if (activeFilter === 'short' && !q && !activeChannelId) {
+        document.getElementById('results').innerHTML =
+          '<p class="hint-text">ショートを絞り込むにはキーワードを入力するか、チャンネルを選んでください</p>';
+        document.getElementById('pagination').hidden = true;
         return;
       }
-      const q = document.getElementById('q').value.trim();
-      if (!activeChannelId && !q) return;
 
       const btn = document.getElementById('btn-search');
       btn.disabled    = true;
       btn.textContent = '検索中…';
       document.getElementById('results').innerHTML = '<p class="loading-text">検索中…</p>';
+      document.getElementById('pagination').hidden = true;
 
       try {
         const url = new URL('https://www.googleapis.com/youtube/v3/search');
@@ -414,24 +563,50 @@
         url.searchParams.set('maxResults', '20');
         url.searchParams.set('key',        apiKey);
 
+        if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+        // Channel filter
         if (activeChannelId) {
           url.searchParams.set('channelId', activeChannelId);
-          url.searchParams.set('order',     'date');
+          url.searchParams.set('order', 'date');
           if (q) url.searchParams.set('q', q);
-        } else {
+        } else if (q) {
           url.searchParams.set('q',     q);
           url.searchParams.set('order', 'relevance');
+        }
+
+        // Video type filter
+        switch (activeFilter) {
+          case 'live':
+            url.searchParams.set('eventType', 'live');
+            // チャンネル未指定・キーワード未入力でも検索できるよう空白クエリを補完
+            if (!activeChannelId && !q) url.searchParams.set('q', ' ');
+            break;
+          case 'archive':
+            url.searchParams.set('eventType', 'completed');
+            if (!activeChannelId && !q) url.searchParams.set('q', ' ');
+            break;
+          case 'short':
+            url.searchParams.set('videoDuration', 'short');
+            break;
         }
 
         const res = await fetch(url);
         if (res.status === 403) throw new Error('API キーが無効または quota 超過です');
         if (!res.ok)            throw new Error(`HTTP ${res.status}`);
 
-        const data = await res.json();
+        const data  = await res.json();
+        nextPageToken = data.nextPageToken || null;
+        currentToken  = pageToken;
+
         renderResults(data.items || []);
+        updatePaginationUI();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
         document.getElementById('results').innerHTML =
           `<div class="error-text">検索エラー: ${escHtml(err.message)}</div>`;
+        nextPageToken = null;
+        updatePaginationUI();
       } finally {
         btn.disabled    = false;
         btn.textContent = '検索';
@@ -447,8 +622,9 @@
         return;
       }
 
+      const isShorts = (activeFilter === 'short');
       const grid = document.createElement('div');
-      grid.className = 'video-grid';
+      grid.className = 'video-grid' + (isShorts ? ' is-shorts' : '');
 
       for (const item of items) {
         const videoId = item.id?.videoId;
@@ -459,6 +635,12 @@
         const isLive = sn.liveBroadcastContent === 'live';
         const meta   = escHtml(sn.channelTitle) + (isLive ? '' : ' · ' + relativeTime(sn.publishedAt));
 
+        const badge = isLive
+          ? '<span class="live-badge">LIVE</span>'
+          : isShorts
+          ? '<span class="shorts-badge">Shorts</span>'
+          : '';
+
         const panelBtns = Array.from({ length: PANEL_COUNT }, (_, pi) =>
           `<button class="btn-panel" data-video-id="${escHtml(videoId)}" data-panel="${pi}">P${pi + 1}</button>`
         ).join('');
@@ -468,7 +650,7 @@
         card.innerHTML = `
           <div class="video-thumb">
             ${thumb ? `<img src="${escHtml(thumb)}" alt="" loading="lazy">` : ''}
-            ${isLive ? '<span class="live-badge">LIVE</span>' : ''}
+            ${badge}
           </div>
           <div class="video-info">
             <div class="video-title">${escHtml(sn.title)}</div>
@@ -508,14 +690,29 @@
       toastTimer = setTimeout(() => { el.hidden = true; }, 2500);
     }
 
-    // ===== Event wiring =====
+    // ===== Pagination buttons =====
 
-    document.getElementById('btn-search').addEventListener('click', doSearch);
-    document.getElementById('q').addEventListener('keydown', e => {
-      if (e.key === 'Enter') doSearch();
+    document.getElementById('btn-next').addEventListener('click', () => {
+      if (!nextPageToken) return;
+      pageHistory.push(currentToken); // 現在のページに戻るためのトークンを保存
+      currentPage++;
+      doSearch(nextPageToken);
     });
 
-    // Panel button clicks — event delegation
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      if (!pageHistory.length) return;
+      const prevToken = pageHistory.pop();
+      currentPage--;
+      doSearch(prevToken);
+    });
+
+    // ===== Event wiring =====
+
+    document.getElementById('btn-search').addEventListener('click', resetAndSearch);
+    document.getElementById('q').addEventListener('keydown', e => {
+      if (e.key === 'Enter') resetAndSearch();
+    });
+
     document.getElementById('results').addEventListener('click', e => {
       const btn = e.target.closest('.btn-panel');
       if (!btn) return;
@@ -532,19 +729,12 @@
     if (apiKey) {
       statusEl.textContent = '✓ API Key あり';
       statusEl.className = 'ok';
+      // デフォルトでライブ中を検索
+      doSearch(null);
     } else {
       statusEl.textContent = '⚠ API Key 未設定';
       statusEl.className = 'err';
       showApiWarning();
-    }
-
-    if (apiKey && !favorites.length) {
-      document.getElementById('results').innerHTML =
-        '<p class="hint-text">チャンネルを追加するか、キーワードを入力して検索してください<br>' +
-        '<small style="color:#374151">チャンネルのお気に入りはダッシュボードのチャンネルブラウザから登録できます</small></p>';
-    } else if (apiKey) {
-      document.getElementById('results').innerHTML =
-        '<p class="hint-text">チャンネルチップを選ぶか、キーワードを入力して検索してください</p>';
     }
   </script>
 </body>
