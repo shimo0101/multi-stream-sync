@@ -681,6 +681,22 @@ async function init() {
   refreshLayoutSelector();
   refreshSyncRefSelector();
   applyLayout(bestLayoutForCount(panels.length));
+
+  // URL パラメーター経由のインポート（Android でリンクを開いたとき）
+  // ※ パネル生成後に実行することで cbOpen() 内の P1〜P4 ボタンが正しく描画される
+  const _importParam = new URLSearchParams(location.search).get('import-ch');
+  if (_importParam) {
+    const added = cbImport(_importParam);
+    if (added > 0) {
+      cbSetStatus(`${added} チャンネルを取り込みました`, 'ok');
+      cbOpen();
+    } else if (added === 0) {
+      cbSetStatus('すべてのチャンネルは既に登録済みです', 'info');
+    } else {
+      cbSetStatus('チャンネルデータの読み込みに失敗しました', 'error');
+    }
+    history.replaceState(null, '', location.pathname);
+  }
 }
 
 // ===== ヘッダーのイベント =====
@@ -1354,17 +1370,3 @@ document.getElementById('btn-cb-copy').addEventListener('click', async () => {
   }
 });
 
-// URL パラメーター経由のインポート（Android でリンクを開いたとき）
-const _importParam = new URLSearchParams(location.search).get('import-ch');
-if (_importParam) {
-  const added = cbImport(_importParam);
-  if (added > 0) {
-    cbSetStatus(`${added} チャンネルを取り込みました`, 'ok');
-    cbOpen();
-  } else if (added === 0) {
-    cbSetStatus('すべてのチャンネルは既に登録済みです', 'info');
-  } else {
-    cbSetStatus('チャンネルデータの読み込みに失敗しました', 'error');
-  }
-  history.replaceState(null, '', location.pathname);
-}
