@@ -1246,3 +1246,76 @@ try {
 
 // 起動時にお気に入りをロード
 cbLoad();
+
+// ===== チャンネル共有（PC → Android） =====
+
+function cbExport() {
+  const data = {
+    yt: cbFavorites.youtube.map(ch => ({ i: ch.channelId, n: ch.name })),
+    tw: cbFavorites.twitch.map(ch => ({ u: ch.username })),
+  };
+  const json = JSON.stringify(data);
+  const b64  = btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g,
+    (_, p) => String.fromCharCode(parseInt(p, 16))));
+  return location.origin + location.pathname + '?import-ch=' + encodeURIComponent(b64);
+}
+
+function cbImport(b64) {
+  try {
+    const json = decodeURIComponent(
+      Array.from(atob(b64), c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+    );
+    const data = JSON.parse(json);
+    let added = 0;
+    for (const ch of (data.yt || [])) {
+      if (ch.i && !cbFavorites.youtube.some(c => c.channelId === ch.i)) {
+        cbFavorites.youtube.push({ channelId: ch.i, name: ch.n || ch.i, thumbnailUrl: null, liveVideoId: null, liveTitle: null });
+        added++;
+      }
+    }
+    for (const ch of (data.tw || [])) {
+      if (ch.u && !cbFavorites.twitch.some(c => c.username === ch.u)) {
+        cbFavorites.twitch.push({ username: ch.u });
+        added++;
+      }
+    }
+    if (added > 0) cbSave();
+    return added;
+  } catch { return -1; }
+}
+
+// 📤 共有ボタン
+document.getElementById('btn-cb-share').addEventListener('click', () => {
+  const panel = document.getElementById('cb-share-panel');
+  const isHidden = panel.hidden;
+  panel.hidden = !isHidden;
+  if (!isHidden) return;
+  const url = cbExport();
+  document.getElementById('cb-share-url-text').textContent = url;
+});
+
+// コピーボタン
+document.getElementById('btn-cb-copy').addEventListener('click', async () => {
+  const url = document.getElementById('cb-share-url-text').textContent;
+  try {
+    await navigator.clipboard.writeText(url);
+    cbSetStatus('URL をコピーしました', 'ok');
+  } catch {
+    cbSetStatus('コピーできませんでした（手動でコピーしてください）', 'error');
+  }
+});
+
+// URL パラメーター経由のインポート（Android でリンクを開いたとき）
+const _importParam = new URLSearchParams(location.search).get('import-ch');
+if (_importParam) {
+  const added = cbImport(_importParam);
+  if (added > 0) {
+    cbSetStatus(`${added} チャンネルを取り込みました`, 'ok');
+    cbOpen();
+  } else if (added === 0) {
+    cbSetStatus('すべてのチャンネルは既に登録済みです', 'info');
+  } else {
+    cbSetStatus('チャンネルデータの読み込みに失敗しました', 'error');
+  }
+  history.replaceState(null, '', location.pathname);
+}
