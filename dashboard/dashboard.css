@@ -632,10 +632,21 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 
   .channel-browser { width: 100%; }
 
-  /* チャンネルブラウザ: はみ出し防止 */
-  .cb-pane      { overflow-x: hidden; }
+  /* チャンネルブラウザ: はみ出し防止・余白最適化 */
+  .cb-header    { padding: 8px 12px; }
+  .cb-tab       { padding: 6px 8px; font-size: 12px; }
+  .cb-pane      { overflow-x: hidden; padding: 8px; gap: 6px; }
+  .cb-item      { padding: 6px 8px; gap: 6px; }
   .cb-actions   { flex-shrink: 1; }
-  .cb-panel-row { flex-wrap: wrap; }
+  /* P1〜P4 を 2列グリッドに固定して横幅を抑える */
+  .cb-panel-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+  .cb-open-btn  { padding: 2px 5px; font-size: 10px; text-align: center; }
+  .cb-reorder-btn { padding: 2px 6px; font-size: 11px; }
+  /* アクション行ボタン: 高さ・フォントを最適化 */
+  .cb-action-row .btn { font-size: 11px; padding: 5px 8px; min-height: 36px; }
+  .cb-add-row .btn    { min-height: 36px; }
+  /* iOS auto-zoom 防止: 入力欄フォントを 16px に */
+  .cb-add-row .input  { font-size: 16px; }
 
   /* トップバー: コンパクト化 */
   .app-title { font-size: 12px; }
