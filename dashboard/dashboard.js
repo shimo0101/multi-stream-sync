@@ -780,7 +780,7 @@ document.getElementById('btn-chat-all').addEventListener('click', () => {
   else setStatus(`${started} パネルのチャットを開始しました`, 'ok');
 });
 
-// ⛶ 全画面トグル
+// ⛶ 全画面トグル（アプリ UI）
 function setFullscreen(on) {
   document.body.classList.toggle('is-fullscreen', on);
   if (on) cbClose();
@@ -799,6 +799,21 @@ document.addEventListener('keydown', (e) => {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (e.key === 'f' || e.key === 'F') setFullscreen(!document.body.classList.contains('is-fullscreen'));
   if (e.key === 'Escape') setFullscreen(false);
+});
+
+// ⛶ ブラウザ全画面（アドレスバー非表示）
+const btnNativeFs = document.getElementById('btn-native-fs');
+
+btnNativeFs.addEventListener('click', () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  } else {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  btnNativeFs.classList.toggle('is-open', !!document.fullscreenElement);
 });
 
 // ⚙ 共通設定トグル
