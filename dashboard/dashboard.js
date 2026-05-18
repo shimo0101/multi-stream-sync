@@ -959,6 +959,7 @@ function cbRenderYtList() {
     list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
     return;
   }
+  const last = cbFavorites.youtube.length - 1;
   list.innerHTML = cbFavorites.youtube.map((ch, i) => `
     <li class="cb-item${ch.liveVideoId ? ' is-live' : ''}">
       ${ch.thumbnailUrl
@@ -980,6 +981,10 @@ function cbRenderYtList() {
                      ${ch.liveVideoId ? '' : 'disabled'}>P${pi + 1}</button>`
           ).join('')}
         </div>
+        <div class="cb-reorder-row">
+          <button class="cb-reorder-btn" data-cb-yt-up="${i}" ${i === 0    ? 'disabled' : ''}>↑</button>
+          <button class="cb-reorder-btn" data-cb-yt-down="${i}" ${i === last ? 'disabled' : ''}>↓</button>
+        </div>
         <button class="cb-del-btn" data-cb-yt-del="${i}">✕</button>
       </div>
     </li>
@@ -992,6 +997,7 @@ function cbRenderTwList() {
     list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
     return;
   }
+  const last = cbFavorites.twitch.length - 1;
   list.innerHTML = cbFavorites.twitch.map((ch, i) => `
     <li class="cb-item">
       <div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>
@@ -1004,6 +1010,10 @@ function cbRenderTwList() {
           ${panels.map((_, pi) =>
             `<button class="cb-open-btn" data-cb-tw-open="${i}" data-panel="${pi}">P${pi + 1}</button>`
           ).join('')}
+        </div>
+        <div class="cb-reorder-row">
+          <button class="cb-reorder-btn" data-cb-tw-up="${i}" ${i === 0    ? 'disabled' : ''}>↑</button>
+          <button class="cb-reorder-btn" data-cb-tw-down="${i}" ${i === last ? 'disabled' : ''}>↓</button>
         </div>
         <button class="cb-del-btn" data-cb-tw-del="${i}">✕</button>
       </div>
@@ -1109,8 +1119,22 @@ function cbTwAdd() {
 document.getElementById('cb-tw-add').addEventListener('click', cbTwAdd);
 document.getElementById('cb-tw-input').addEventListener('keydown', e => { if (e.key === 'Enter') cbTwAdd(); });
 
-// YouTube リスト: 削除・パネル展開（イベント委任）
+// YouTube リスト: 並び替え・削除・パネル展開（イベント委任）
 document.getElementById('cb-yt-list').addEventListener('click', (e) => {
+  const upIdx = e.target.dataset.cbYtUp;
+  if (upIdx != null) {
+    const i = Number(upIdx);
+    [cbFavorites.youtube[i - 1], cbFavorites.youtube[i]] = [cbFavorites.youtube[i], cbFavorites.youtube[i - 1]];
+    cbSave(); cbRenderYtList(); return;
+  }
+
+  const downIdx = e.target.dataset.cbYtDown;
+  if (downIdx != null) {
+    const i = Number(downIdx);
+    [cbFavorites.youtube[i], cbFavorites.youtube[i + 1]] = [cbFavorites.youtube[i + 1], cbFavorites.youtube[i]];
+    cbSave(); cbRenderYtList(); return;
+  }
+
   const delIdx = e.target.dataset.cbYtDel;
   if (delIdx != null) {
     cbFavorites.youtube.splice(Number(delIdx), 1);
@@ -1133,8 +1157,22 @@ document.getElementById('cb-yt-list').addEventListener('click', (e) => {
   }
 });
 
-// Twitch リスト: 削除・パネル展開（イベント委任）
+// Twitch リスト: 並び替え・削除・パネル展開（イベント委任）
 document.getElementById('cb-tw-list').addEventListener('click', (e) => {
+  const upIdx = e.target.dataset.cbTwUp;
+  if (upIdx != null) {
+    const i = Number(upIdx);
+    [cbFavorites.twitch[i - 1], cbFavorites.twitch[i]] = [cbFavorites.twitch[i], cbFavorites.twitch[i - 1]];
+    cbSave(); cbRenderTwList(); return;
+  }
+
+  const downIdx = e.target.dataset.cbTwDown;
+  if (downIdx != null) {
+    const i = Number(downIdx);
+    [cbFavorites.twitch[i], cbFavorites.twitch[i + 1]] = [cbFavorites.twitch[i + 1], cbFavorites.twitch[i]];
+    cbSave(); cbRenderTwList(); return;
+  }
+
   const delIdx = e.target.dataset.cbTwDel;
   if (delIdx != null) {
     cbFavorites.twitch.splice(Number(delIdx), 1);

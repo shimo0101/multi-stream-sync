@@ -577,6 +577,21 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 }
 .cb-del-btn:hover { color: #f87171; border-color: #dc2626; }
 
+.cb-reorder-row { display: flex; gap: 2px; }
+.cb-reorder-btn {
+  padding: 2px 7px;
+  font-size: 12px;
+  background: transparent;
+  color: #4b5563;
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+  line-height: 1.4;
+}
+.cb-reorder-btn:hover:not(:disabled) { color: #a78bfa; border-color: #6d28d9; }
+.cb-reorder-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
 /* ===== Topbar row break (mobile only) ===== */
 .tb-break { display: none; }
 
