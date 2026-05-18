@@ -1,0 +1,17 @@
+{
+  "name": "MultiStream Sync",
+  "short_name": "MultiStream",
+  "start_url": "dashboard.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0f0f13",
+  "theme_color": "#1a1a24",
+  "icons": [
+    {
+      "src": "../icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

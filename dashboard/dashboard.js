@@ -805,17 +805,22 @@ document.addEventListener('keydown', (e) => {
 // ⛶ ブラウザ全画面（アドレスバー非表示）
 const btnNativeFs = document.getElementById('btn-native-fs');
 
-btnNativeFs.addEventListener('click', () => {
-  if (document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {});
-  } else {
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
-});
+if (!document.fullscreenEnabled) {
+  // iOS Safari は requestFullscreen 非対応のため非表示
+  btnNativeFs.hidden = true;
+} else {
+  btnNativeFs.addEventListener('click', () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  });
 
-document.addEventListener('fullscreenchange', () => {
-  btnNativeFs.classList.toggle('is-open', !!document.fullscreenElement);
-});
+  document.addEventListener('fullscreenchange', () => {
+    btnNativeFs.classList.toggle('is-open', !!document.fullscreenElement);
+  });
+}
 
 // ⚙ 共通設定トグル
 document.getElementById('btn-settings').addEventListener('click', () => {
