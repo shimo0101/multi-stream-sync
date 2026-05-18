@@ -1320,13 +1320,18 @@ function cbExport() {
     tw: cbFavorites.twitch.map(ch => ({ u: ch.username })),
   };
   const json = JSON.stringify(data);
-  const b64  = btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g,
-    (_, p) => String.fromCharCode(parseInt(p, 16))));
-  return location.origin + location.pathname + '?import-ch=' + encodeURIComponent(b64);
+  // URL-safe base64: +→- /→_ =省略。% エンコード不要になりアプリ経由でも壊れない
+  const b64 = btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g,
+    (_, p) => String.fromCharCode(parseInt(p, 16))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return location.origin + location.pathname + '?import-ch=' + b64;
 }
 
-function cbImport(b64) {
+function cbImport(b64raw) {
   try {
+    // URL-safe(-/_)・標準(+/)どちらにも対応し、パディングを正規化してから atob
+    const unpadded = b64raw.replace(/-/g, '+').replace(/_/g, '/').replace(/=/g, '');
+    const b64 = unpadded + '='.repeat((4 - unpadded.length % 4) % 4);
     const json = decodeURIComponent(
       Array.from(atob(b64), c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
     );
