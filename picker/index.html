@@ -331,8 +331,8 @@
       <div class="filter-row">
         <span class="filter-label">絞り込み:</span>
         <button class="filter-btn" data-filter="video">動画</button>
-        <button class="filter-btn is-active" data-filter="live">🔴 ライブ中</button>
-        <button class="filter-btn" data-filter="archive">📼 アーカイブ</button>
+        <button class="filter-btn" data-filter="live">🔴 ライブ中</button>
+        <button class="filter-btn is-active" data-filter="archive">📼 アーカイブ</button>
         <button class="filter-btn" data-filter="short">▶ ショート</button>
       </div>
     </div>
@@ -404,7 +404,7 @@
     // ===== State =====
     let activePtab      = 'youtube';
     let activeChannelId = null;
-    let activeFilter    = 'live'; // 'video' | 'live' | 'archive' | 'short'
+    let activeFilter    = 'archive'; // 'video' | 'live' | 'archive' | 'short'
 
     // Pagination
     let pageHistory   = [];   // tokens that were used to reach each page (for going back)
@@ -643,6 +643,71 @@
 
     // ===== YouTube API search =====
 
+    // チャンネル選択 + アーカイブ/動画フィルター:
+    // search.list は検索インデックス依存で取得漏れが多いため
+    // playlistItems.list（アップロード一覧）+ videos.list で完全取得する
+    async function doSearchByPlaylist(pageToken) {
+      const uploadsId = 'UU' + activeChannelId.slice(2);
+
+      const plUrl = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+      plUrl.searchParams.set('part',       'contentDetails');
+      plUrl.searchParams.set('playlistId', uploadsId);
+      plUrl.searchParams.set('maxResults', String(MAX_RESULTS));
+      plUrl.searchParams.set('key',        apiKey);
+      if (pageToken) plUrl.searchParams.set('pageToken', pageToken);
+
+      const plRes = await fetch(plUrl);
+      if (plRes.status === 403) throw new Error('API キーが無効または quota 超過です');
+      if (!plRes.ok)            throw new Error(`HTTP ${plRes.status}`);
+      const plData = await plRes.json();
+
+      const videoIds = (plData.items ?? []).map(i => i.contentDetails.videoId);
+      if (!videoIds.length) {
+        nextPageToken = plData.nextPageToken || null;
+        currentToken  = pageToken;
+        renderResults([]);
+        updatePaginationUI();
+        return;
+      }
+
+      // videos.list でライブ配信情報を取得してフィルタリング
+      const vUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+      vUrl.searchParams.set('part', 'snippet,liveStreamingDetails');
+      vUrl.searchParams.set('id',   videoIds.join(','));
+      vUrl.searchParams.set('key',  apiKey);
+
+      const vRes = await fetch(vUrl);
+      if (!vRes.ok) throw new Error(`HTTP ${vRes.status}`);
+      const vData = await vRes.json();
+
+      let filtered = vData.items ?? [];
+      if (activeFilter === 'archive') {
+        filtered = filtered.filter(v => v.liveStreamingDetails?.actualEndTime);
+      } else {
+        // 'video': 通常アップロード（ライブ配信ではないもの）
+        filtered = filtered.filter(v => !v.liveStreamingDetails);
+      }
+
+      // search.list と同じ形式に正規化して renderResults を共通利用
+      const items = filtered.map(v => ({
+        id: { videoId: v.id },
+        snippet: {
+          title:               v.snippet.title,
+          thumbnails:          v.snippet.thumbnails,
+          publishedAt:         v.snippet.publishedAt,
+          channelTitle:        v.snippet.channelTitle,
+          liveBroadcastContent: 'none',
+        }
+      }));
+
+      nextPageToken = plData.nextPageToken || null;
+      currentToken  = pageToken;
+
+      renderResults(items);
+      updatePaginationUI();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     async function doSearch(pageToken) {
       if (!apiKey) { showApiWarning(); return; }
 
@@ -663,6 +728,12 @@
       document.getElementById('pagination').hidden = true;
 
       try {
+        // チャンネル選択済み + アーカイブ/動画 → playlistItems で完全取得
+        if (activeChannelId && (activeFilter === 'archive' || activeFilter === 'video')) {
+          await doSearchByPlaylist(pageToken);
+          return;
+        }
+
         const url = new URL('https://www.googleapis.com/youtube/v3/search');
         url.searchParams.set('part',       'snippet');
         url.searchParams.set('type',       'video');
@@ -673,7 +744,6 @@
         if (pageToken) url.searchParams.set('pageToken', pageToken);
 
         // チャンネルチップ選択: そのチャンネルを date 順（新しい順）で取得
-        // → ページ送りで順に古い動画を取得できる
         if (activeChannelId) {
           url.searchParams.set('channelId', activeChannelId);
           url.searchParams.set('order',     'date');
@@ -689,18 +759,14 @@
         // 絞り込みフィルター（YouTube タブ分類準拠）
         switch (activeFilter) {
           case 'video':
-            // eventType なし → 通常動画（YouTube の「動画」タブ相当）
             break;
           case 'live':
-            // 現在配信中（YouTube の「ライブ」タブ）
             url.searchParams.set('eventType', 'live');
             break;
           case 'archive':
-            // 配信済みアーカイブ（YouTube の「ライブ」タブ内のアーカイブ）
             url.searchParams.set('eventType', 'completed');
             break;
           case 'short':
-            // 4分以内の動画（ショート相当）
             url.searchParams.set('videoDuration', 'short');
             break;
         }
