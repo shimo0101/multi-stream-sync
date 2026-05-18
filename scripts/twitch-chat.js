@@ -102,12 +102,14 @@ export class TwitchChatClient {
     // @badge-info=...;badges=broadcaster/1,moderator/1,subscriber/0;... :nick!... PRIVMSG #ch :text
     const tagged = line.match(/^@(\S+) :\w+!\w+@\S+ PRIVMSG #\S+ :(.+)$/);
     if (tagged) {
-      const [, tagStr, text] = tagged;
+      const [, tagStr, rawText] = tagged;
       const tags        = Object.fromEntries(tagStr.split(';').map(t => t.split('=')));
       const badges      = tags.badges ?? '';
       const isOwner     = badges.includes('broadcaster');
       const isModerator = badges.includes('moderator');
       const isMember    = badges.includes('subscriber') || badges.includes('founder');
+      const text        = TwitchChatClient.#stripEmotes(rawText, tags.emotes ?? '');
+      if (!text) return; // スタンプのみのメッセージは表示しない
       this.#onMessage({ text, isOwner, isModerator, isMember });
       return;
     }
@@ -117,6 +119,27 @@ export class TwitchChatClient {
     if (plain) {
       this.#onMessage({ text: plain[1], isOwner: false, isModerator: false, isMember: false });
     }
+  }
+
+  // emotes タグ（例: "25:0-4/354:6-10,15-19"）を使ってスタンプ部分を除去する
+  static #stripEmotes(text, emoteStr) {
+    if (!emoteStr) return text;
+    const ranges = [];
+    for (const part of emoteStr.split('/')) {
+      const colon = part.indexOf(':');
+      if (colon === -1) continue;
+      for (const range of part.slice(colon + 1).split(',')) {
+        const [s, e] = range.split('-').map(Number);
+        if (Number.isFinite(s) && Number.isFinite(e)) ranges.push([s, e]);
+      }
+    }
+    if (!ranges.length) return text;
+    ranges.sort((a, b) => b[0] - a[0]); // 末尾から削除して index がずれないよう降順
+    const chars = [...text]; // Unicode コードポイント単位で扱う
+    for (const [s, e] of ranges) {
+      chars.splice(s, e - s + 1);
+    }
+    return chars.join('').replace(/\s{2,}/g, ' ').trim();
   }
 
   #cleanup(status) {
