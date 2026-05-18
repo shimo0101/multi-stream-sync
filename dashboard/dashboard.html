@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=15">
+  <link rel="stylesheet" href="dashboard.css?v=16">
 </head>
 <body>
 
@@ -50,6 +50,11 @@
         <label class="config-label" for="tw-relay-url">Twitch relay URL</label>
         <input type="text" id="tw-relay-url" class="input"
                placeholder="https://…/twitch-relay/relay.html" autocomplete="off">
+      </div>
+      <div class="settings-item">
+        <label class="config-label" for="tw-client-id">Twitch Client ID</label>
+        <input type="text" id="tw-client-id" class="input input--sm"
+               placeholder="dev.twitch.tv で取得" autocomplete="off">
       </div>
     </div>
     <p class="settings-note">
@@ -104,6 +109,6 @@
     </div>
   </aside>
 
-  <script type="module" src="dashboard.js?v=15"></script>
+  <script type="module" src="dashboard.js?v=16"></script>
 </body>
 </html>

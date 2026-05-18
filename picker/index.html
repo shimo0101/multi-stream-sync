@@ -297,8 +297,77 @@
     }
     #toast.is-warn { background: #2a1500; border-color: #92400e; color: #fde68a; }
 
+    /* ===== Twitch Auth ===== */
+    .tw-auth-section {
+      margin-bottom: 12px; padding: 10px 14px;
+      background: #13132a; border: 1px solid #2a2a4a; border-radius: 8px;
+      font-size: 12px;
+    }
+    .tw-auth-hint { color: #4b5563; line-height: 1.6; }
+    .tw-auth-hint strong { color: #6b7280; }
+    .tw-auth-ok   { color: #6ee7b7; display: flex; align-items: center; gap: 8px; }
+    .btn-tw-login {
+      display: inline-block; padding: 7px 16px; margin-top: 6px;
+      background: #6441a5; color: #fff; border-radius: 6px;
+      font-size: 12px; font-weight: 700; text-decoration: none; border: none;
+      cursor: pointer; transition: background 0.12s;
+    }
+    .btn-tw-login:hover { background: #7b52c8; }
+    .btn-tw-logout {
+      padding: 2px 8px; font-size: 11px;
+      background: transparent; color: #6b7280;
+      border: 1px solid #2a2a3a; border-radius: 4px;
+      cursor: pointer; transition: color 0.1s;
+    }
+    .btn-tw-logout:hover { color: #f87171; border-color: #dc2626; }
+    .tw-auth-redirect { font-size: 10px; color: #374151; margin-top: 5px; word-break: break-all; }
+    .tw-auth-redirect code { color: #6b7280; background: #1a1a2a; padding: 1px 4px; border-radius: 3px; }
+
+    /* ===== Twitch VOD view ===== */
+    .tw-vod-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+    }
+    .btn-tw-back {
+      padding: 5px 12px; font-size: 12px; font-weight: 600;
+      background: #1a1a2a; color: #c4b5fd;
+      border: 1px solid #3a3a5a; border-radius: 6px;
+      cursor: pointer; transition: background 0.12s; white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-tw-back:hover { background: #2a2a4a; }
+    .tw-vod-ch-name { font-size: 14px; font-weight: 700; color: #a78bfa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .tw-vod-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .tw-vod-card {
+      display: flex; flex-direction: column;
+      background: #1a1a2a; border: 1px solid #2a2a3a; border-radius: 8px;
+      overflow: hidden; transition: border-color 0.12s;
+    }
+    .tw-vod-card:hover { border-color: #6441a5; }
+    .tw-vod-thumb {
+      position: relative; width: 100%; aspect-ratio: 16/9;
+      background: #0a0a10; overflow: hidden; flex-shrink: 0;
+    }
+    .tw-vod-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .tw-vod-dur {
+      position: absolute; bottom: 5px; right: 6px;
+      background: rgba(0,0,0,0.78); color: #fff;
+      font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 3px;
+    }
+    .tw-vod-info { padding: 8px 10px 4px; flex: 1; }
+    .tw-vod-title {
+      font-size: 12px; font-weight: 600; color: #e0e0e0; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; margin-bottom: 3px;
+    }
+    .tw-vod-meta { font-size: 11px; color: #6b7280; }
+
     /* ===== Responsive ===== */
     @media (max-width: 560px) {
+      .tw-vod-grid { grid-template-columns: 1fr; }
       .video-grid { grid-template-columns: 1fr; }
       .video-grid.is-shorts { grid-template-columns: 1fr 1fr; }
       .tw-grid { grid-template-columns: 1fr; }
@@ -364,9 +433,12 @@
     <!-- ===== Twitch pane ===== -->
     <div id="tw-pane" hidden>
 
-      <!-- VOD URL 直接入力 -->
-      <div class="tw-vod-box">
-        <div class="tw-section-label">VOD を開く</div>
+      <!-- Twitch 認証 -->
+      <div class="tw-auth-section" id="tw-auth-section"></div>
+
+      <!-- VOD URL 直接入力（フォールバック） -->
+      <div class="tw-vod-box" id="tw-vod-box">
+        <div class="tw-section-label">URL で VOD を開く</div>
         <input type="text" id="tw-vod-url" class="search-input"
                placeholder="https://www.twitch.tv/videos/…  または  動画ID"
                autocomplete="off">
@@ -377,14 +449,27 @@
           <button class="btn-panel" data-vod-panel="2">P3</button>
           <button class="btn-panel" data-vod-panel="3">P4</button>
         </div>
-        <p class="tw-vod-hint">
-          チャンネルの「VOD ↗」で Twitch の動画ページを開き、目的の VOD の URL をコピーして上の欄に貼り付けてください。
-        </p>
       </div>
 
-      <!-- お気に入りチャンネル -->
-      <div class="tw-favorites-label">お気に入りチャンネル</div>
-      <div id="tw-results"></div>
+      <!-- チャンネル一覧ビュー -->
+      <div id="tw-channels-view">
+        <div class="tw-favorites-label">お気に入りチャンネル</div>
+        <div id="tw-results"></div>
+      </div>
+
+      <!-- VOD 一覧ビュー（チャンネル選択後） -->
+      <div id="tw-vod-view" hidden>
+        <div class="tw-vod-header">
+          <button class="btn-tw-back" id="btn-tw-back">← チャンネル一覧</button>
+          <span class="tw-vod-ch-name" id="tw-vod-ch-name"></span>
+        </div>
+        <div id="tw-vod-results"></div>
+        <div class="pagination" id="tw-vod-pagination" hidden>
+          <button class="btn-page" id="btn-tw-prev" disabled>← 前へ</button>
+          <span class="page-num" id="tw-page-num">1 ページ</span>
+          <button class="btn-page" id="btn-tw-next" disabled>次へ →</button>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -400,6 +485,17 @@
     let apiKey      = '';
     let ytFavorites = [];
     let twFavorites = [];
+
+    // Twitch OAuth / VOD
+    let twClientId         = '';
+    let twToken            = null;
+    const TW_TOKEN_KEY     = 'mss-tw-token';
+    let twVodUsername      = null;
+    let twVodUserId        = null;
+    let twVodCurrentCursor = null;
+    let twVodNextCursor    = null;
+    let twVodCursorHistory = [];
+    let twVodPage          = 1;
 
     // ===== State =====
     let activePtab      = 'youtube';
@@ -417,13 +513,15 @@
     function loadStorage() {
       try {
         const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-        apiKey = s.ytApiKey || '';
+        apiKey     = s.ytApiKey    || '';
+        twClientId = s.twClientId  || '';
       } catch {}
       try {
         const f = JSON.parse(localStorage.getItem(FAV_KEY) || '{}');
         ytFavorites = f.youtube || [];
         twFavorites = f.twitch  || [];
       } catch {}
+      twToken = localStorage.getItem(TW_TOKEN_KEY) || null;
     }
 
     // ===== BroadcastChannel =====
@@ -441,6 +539,158 @@
       showToast(`${plName} P${panelIdx + 1} に送信しました`);
     }
 
+    // ===== Twitch OAuth & VOD =====
+
+    // OAuth リダイレクト後のトークンをハッシュから取得
+    function handleTwOAuth() {
+      const hash  = new URLSearchParams(location.hash.slice(1));
+      const token = hash.get('access_token');
+      if (token) {
+        twToken = token;
+        localStorage.setItem(TW_TOKEN_KEY, token);
+        history.replaceState(null, '', location.pathname + location.search);
+        return true; // 新規認証
+      }
+      return false;
+    }
+
+    function renderTwitchAuth() {
+      const el = document.getElementById('tw-auth-section');
+      if (!el) return;
+      if (!twClientId) {
+        el.innerHTML =
+          `<p class="tw-auth-hint">⚙ ダッシュボードの共通設定で <strong>Twitch Client ID</strong> を設定すると VOD 一覧が使えます。<br>
+           <small>dev.twitch.tv でアプリを作成し、リダイレクト URI に <code>${escHtml(location.origin + location.pathname)}</code> を登録してください。</small></p>`;
+        return;
+      }
+      if (twToken) {
+        el.innerHTML =
+          `<span class="tw-auth-ok">✓ Twitch 認証済み
+           <button class="btn-tw-logout" id="btn-tw-logout">ログアウト</button></span>`;
+        document.getElementById('btn-tw-logout').addEventListener('click', () => {
+          twToken = null;
+          localStorage.removeItem(TW_TOKEN_KEY);
+          renderTwitchAuth();
+          renderTwitchFavorites();
+        });
+      } else {
+        const redirectUri = encodeURIComponent(location.origin + location.pathname);
+        const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${encodeURIComponent(twClientId)}&redirect_uri=${redirectUri}&response_type=token&scope=`;
+        el.innerHTML =
+          `<a href="${authUrl}" class="btn-tw-login">Twitch でログインして VOD 一覧を使う</a>
+           <p class="tw-auth-redirect">リダイレクト URI: <code>${escHtml(location.origin + location.pathname)}</code></p>`;
+      }
+    }
+
+    async function twFetch(path) {
+      const res = await fetch('https://api.twitch.tv/helix/' + path, {
+        headers: {
+          'Authorization': 'Bearer ' + twToken,
+          'Client-Id':     twClientId,
+        }
+      });
+      if (res.status === 401) {
+        twToken = null;
+        localStorage.removeItem(TW_TOKEN_KEY);
+        renderTwitchAuth();
+        renderTwitchFavorites();
+        throw new Error('Twitch 認証が切れました。再ログインしてください');
+      }
+      if (!res.ok) throw new Error(`Twitch API エラー: HTTP ${res.status}`);
+      return res.json();
+    }
+
+    // "1h2m3s" → "1:02:03"
+    function twDuration(d) {
+      const h = Number((d.match(/(\d+)h/) || [0, 0])[1]);
+      const m = Number((d.match(/(\d+)m/) || [0, 0])[1]);
+      const s = Number((d.match(/(\d+)s/) || [0, 0])[1]);
+      if (h) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    function twThumb(url) {
+      return url ? url.replace('%{width}', '320').replace('%{height}', '180') : '';
+    }
+
+    async function twShowVods(username, cursor = null) {
+      document.getElementById('tw-channels-view').hidden = true;
+      document.getElementById('tw-vod-view').hidden      = false;
+      document.getElementById('tw-vod-ch-name').textContent = username;
+      document.getElementById('tw-vod-results').innerHTML   = '<p class="loading-text">VOD を取得中…</p>';
+      document.getElementById('tw-vod-pagination').hidden   = true;
+
+      twVodCurrentCursor = cursor;
+
+      try {
+        if (twVodUsername !== username) {
+          const uData = await twFetch(`users?login=${encodeURIComponent(username)}`);
+          const user  = uData.data?.[0];
+          if (!user) throw new Error(`ユーザー "${username}" が見つかりません`);
+          twVodUserId   = user.id;
+          twVodUsername = username;
+        }
+
+        let path = `videos?user_id=${twVodUserId}&type=archive&first=20`;
+        if (cursor) path += `&after=${encodeURIComponent(cursor)}`;
+
+        const data = await twFetch(path);
+        twVodNextCursor = data.pagination?.cursor || null;
+
+        renderTwVods(data.data ?? []);
+
+        const pag     = document.getElementById('tw-vod-pagination');
+        const hasPrev = twVodCursorHistory.length > 0;
+        const hasNext = !!twVodNextCursor;
+        pag.hidden = !hasPrev && !hasNext;
+        document.getElementById('btn-tw-prev').disabled = !hasPrev;
+        document.getElementById('btn-tw-next').disabled = !hasNext;
+        document.getElementById('tw-page-num').textContent = `${twVodPage} ページ`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        document.getElementById('tw-vod-results').innerHTML =
+          `<div class="error-text">エラー: ${escHtml(err.message)}</div>`;
+      }
+    }
+
+    function renderTwVods(vods) {
+      const container = document.getElementById('tw-vod-results');
+      if (!vods.length) {
+        container.innerHTML = '<p class="hint-text">VOD が見つかりませんでした</p>';
+        return;
+      }
+      const grid = document.createElement('div');
+      grid.className = 'tw-vod-grid';
+
+      for (const v of vods) {
+        const thumb = twThumb(v.thumbnail_url);
+        const dur   = twDuration(v.duration || '');
+
+        const panelBtns = Array.from({ length: PANEL_COUNT }, (_, pi) =>
+          `<button class="btn-panel" data-tw-vod-url="${escHtml(v.url)}" data-panel="${pi}">P${pi + 1}</button>`
+        ).join('');
+
+        const card = document.createElement('div');
+        card.className = 'tw-vod-card';
+        card.innerHTML = `
+          <div class="tw-vod-thumb">
+            ${thumb ? `<img src="${escHtml(thumb)}" alt="" loading="lazy">` : ''}
+            ${dur    ? `<span class="tw-vod-dur">${escHtml(dur)}</span>` : ''}
+          </div>
+          <div class="tw-vod-info">
+            <div class="tw-vod-title">${escHtml(v.title)}</div>
+            <div class="tw-vod-meta">${relativeTime(v.created_at)}</div>
+          </div>
+          <div class="video-panel-row">
+            <span class="panel-label">開く→</span>
+            ${panelBtns}
+          </div>`;
+        grid.appendChild(card);
+      }
+      container.innerHTML = '';
+      container.appendChild(grid);
+    }
+
     // ===== Platform tab switching =====
 
     function switchTab(ptab) {
@@ -452,7 +702,7 @@
       document.getElementById('tw-header-controls').hidden = (ptab !== 'twitch');
       document.getElementById('yt-pane').hidden = (ptab !== 'youtube');
       document.getElementById('tw-pane').hidden = (ptab !== 'twitch');
-      if (ptab === 'twitch') renderTwitchFavorites();
+      if (ptab === 'twitch') { renderTwitchAuth(); renderTwitchFavorites(); }
     }
 
     document.querySelectorAll('.platform-tab').forEach(btn =>
@@ -534,6 +784,10 @@
           `<button class="btn-panel" data-tw-user="${escHtml(ch.username)}" data-panel="${pi}">P${pi + 1}</button>`
         ).join('');
 
+        const vodBtn = (twToken && twClientId)
+          ? `<button class="btn-vod btn-tw-vod-list" data-tw-vod-user="${escHtml(ch.username)}">📼 VOD一覧</button>`
+          : `<a class="btn-vod" href="https://www.twitch.tv/${escHtml(ch.username)}/videos" target="_blank" rel="noopener noreferrer">VOD ↗</a>`;
+
         const card = document.createElement('div');
         card.className = 'tw-card';
         card.innerHTML = `
@@ -547,9 +801,7 @@
           <div class="tw-actions">
             <span class="panel-label">開く→</span>
             ${panelBtns}
-            <a class="btn-vod"
-               href="https://www.twitch.tv/${escHtml(ch.username)}/videos"
-               target="_blank" rel="noopener noreferrer">VOD ↗</a>
+            ${vodBtn}
           </div>`;
         grid.appendChild(card);
       }
@@ -560,11 +812,54 @@
 
     document.getElementById('tw-filter').addEventListener('input', renderTwitchFavorites);
 
-    // Twitch ライブ: channel panel buttons (event delegation)
+    // Twitch チャンネル一覧: ライブ開くボタン & VOD一覧ボタン
     document.getElementById('tw-results').addEventListener('click', e => {
-      const btn = e.target.closest('.btn-panel[data-tw-user]');
+      const panelBtn = e.target.closest('.btn-panel[data-tw-user]');
+      if (panelBtn) {
+        sendToPanel(panelBtn.dataset.twUser, Number(panelBtn.dataset.panel), 'twitch');
+        return;
+      }
+      const vodBtn = e.target.closest('.btn-tw-vod-list');
+      if (vodBtn) {
+        twVodCursorHistory = [];
+        twVodCurrentCursor = null;
+        twVodNextCursor    = null;
+        twVodPage          = 1;
+        twVodUsername      = null; // 別チャンネルへの遷移時に user_id を再取得させる
+        twShowVods(vodBtn.dataset.twVodUser);
+      }
+    });
+
+    // Twitch VOD 一覧: パネルボタン
+    document.getElementById('tw-vod-results').addEventListener('click', e => {
+      const btn = e.target.closest('.btn-panel[data-tw-vod-url]');
       if (!btn) return;
-      sendToPanel(btn.dataset.twUser, Number(btn.dataset.panel), 'twitch');
+      sendToPanel(btn.dataset.twVodUrl, Number(btn.dataset.panel), 'twitch');
+    });
+
+    // チャンネル一覧に戻る
+    document.getElementById('btn-tw-back').addEventListener('click', () => {
+      document.getElementById('tw-vod-view').hidden      = true;
+      document.getElementById('tw-channels-view').hidden = false;
+      twVodCursorHistory = [];
+      twVodCurrentCursor = null;
+      twVodNextCursor    = null;
+      twVodPage          = 1;
+    });
+
+    // VOD ページネーション
+    document.getElementById('btn-tw-next').addEventListener('click', () => {
+      if (!twVodNextCursor) return;
+      twVodCursorHistory.push(twVodCurrentCursor);
+      twVodPage++;
+      twShowVods(twVodUsername, twVodNextCursor);
+    });
+
+    document.getElementById('btn-tw-prev').addEventListener('click', () => {
+      if (!twVodCursorHistory.length) return;
+      const prev = twVodCursorHistory.pop();
+      twVodPage--;
+      twShowVods(twVodUsername, prev);
     });
 
     // Twitch VOD: URL input → parse → send
@@ -899,10 +1194,11 @@
     // ===== Init =====
 
     loadStorage();
+    const _justAuthed = handleTwOAuth(); // OAuth リダイレクト後のトークン取得（URL クリーン前に実行）
     initBC();
 
-    // URL パラメータでタブを決定（?tab=twitch で Twitch タブを開く）
-    const initTab = new URLSearchParams(location.search).get('tab') || 'youtube';
+    // OAuth 直後は Twitch タブを優先、それ以外は URL パラメータ
+    const initTab = _justAuthed ? 'twitch' : (new URLSearchParams(location.search).get('tab') || 'youtube');
     switchTab(initTab);
     renderChips();
 

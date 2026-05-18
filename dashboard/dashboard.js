@@ -640,6 +640,7 @@ async function init() {
   setValue('yt-relay-url', settings.ytRelayUrl);
   setValue('tw-parent',    settings.twParent);
   setValue('tw-relay-url', settings.twRelayUrl);
+  setValue('tw-client-id', settings.twClientId);
 
   // 同期基準
   syncRefIdx = Math.min(settings.syncRefIdx ?? 0, (settings.panelCount ?? 2) - 1);
@@ -847,6 +848,11 @@ document.getElementById('tw-relay-url').addEventListener('change', (e) => {
   settings.twRelayUrl = e.target.value.trim();
   saveSettings({ twRelayUrl: settings.twRelayUrl });
   panels.forEach(p => p._twPlayer?.setRelayUrl(settings.twRelayUrl));
+});
+
+document.getElementById('tw-client-id').addEventListener('change', (e) => {
+  settings.twClientId = e.target.value.trim();
+  saveSettings({ twClientId: settings.twClientId });
 });
 
 init().catch(console.error);

@@ -20,6 +20,7 @@ const DEFAULTS = {
   ytRelayUrl:  '',
   twParent:    'localhost',
   twRelayUrl:  '',
+  twClientId:  '',
   // パネル表示順（インデックス i のパネルに CSS order = visualOrder[i] を適用）
   visualOrder: [],
 };
