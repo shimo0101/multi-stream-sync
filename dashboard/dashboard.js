@@ -1150,6 +1150,30 @@ async function cbTwAdd() {
 document.getElementById('cb-tw-add').addEventListener('click', cbTwAdd);
 document.getElementById('cb-tw-input').addEventListener('keydown', e => { if (e.key === 'Enter') cbTwAdd(); });
 
+// Twitch: アイコン一括更新
+document.getElementById('cb-tw-refresh').addEventListener('click', async () => {
+  if (!cbFavorites.twitch.length) { cbSetStatus('チャンネルを追加してください', 'error'); return; }
+  if (!settings.twClientId || !localStorage.getItem('mss-tw-token')) {
+    cbSetStatus('Twitch Client ID と認証が必要です（動画ピッカーから認証してください）', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('cb-tw-refresh');
+  btn.disabled    = true;
+  btn.textContent = '更新中…';
+
+  await Promise.all(cbFavorites.twitch.map(async (ch, i) => {
+    const url = await cbFetchTwitchThumbnail(ch.username);
+    if (url) cbFavorites.twitch[i].thumbnailUrl = url;
+  }));
+
+  cbSave();
+  cbRenderTwList();
+  btn.disabled    = false;
+  btn.textContent = 'アイコン更新';
+  cbSetStatus('Twitch アイコンを更新しました', 'ok');
+});
+
 // YouTube リスト: 並び替え・削除・パネル展開（イベント委任）
 document.getElementById('cb-yt-list').addEventListener('click', (e) => {
   const upIdx = e.target.dataset.cbYtUp;
