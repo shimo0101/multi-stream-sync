@@ -577,6 +577,9 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 }
 .cb-del-btn:hover { color: #f87171; border-color: #dc2626; }
 
+/* ===== Topbar row break (mobile only) ===== */
+.tb-break { display: none; }
+
 /* ===== Responsive: モバイル ===== */
 @media (max-width: 640px) {
   /* タッチ操作では不要なコントロールを非表示 */
@@ -584,6 +587,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   #sel-layout,
   .btn--drag-handle,
   .finetune-group { display: none !important; }
+
+  .tb-break { display: block; flex-basis: 100%; height: 0; }
 
   .channel-browser { width: 100%; }
 
