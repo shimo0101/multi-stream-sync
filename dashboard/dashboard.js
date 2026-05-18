@@ -885,7 +885,7 @@ function cbSave() {
   try {
     const data = {
       youtube: cbFavorites.youtube.map(({ channelId, name, thumbnailUrl }) => ({ channelId, name, thumbnailUrl })),
-      twitch:  cbFavorites.twitch.map(({ username }) => ({ username })),
+      twitch:  cbFavorites.twitch.map(({ username, thumbnailUrl }) => ({ username, thumbnailUrl })),
     };
     localStorage.setItem(CB_STORAGE_KEY, JSON.stringify(data));
   } catch {}
@@ -1011,7 +1011,10 @@ function cbRenderTwList() {
   const last = cbFavorites.twitch.length - 1;
   list.innerHTML = cbFavorites.twitch.map((ch, i) => `
     <li class="cb-item">
-      <div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>
+      ${ch.thumbnailUrl
+        ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
+        : `<div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>`
+      }
       <div class="cb-info">
         <div class="cb-name">${escHtml(ch.username)}</div>
         <div class="cb-status">Twitch</div>
@@ -1112,14 +1115,31 @@ document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
   cbSetStatus(`ライブ確認完了 — ${liveCount} チャンネルが配信中`, liveCount > 0 ? 'ok' : 'info');
 });
 
+// Twitch: 登録時にプロフィール画像を取得（token・clientId がなければ null）
+async function cbFetchTwitchThumbnail(username) {
+  const token    = localStorage.getItem('mss-tw-token');
+  const clientId = settings.twClientId;
+  if (!token || !clientId) return null;
+  try {
+    const res = await fetch(
+      `https://api.twitch.tv/helix/users?login=${encodeURIComponent(username)}`,
+      { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': clientId } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.data?.[0]?.profile_image_url ?? null;
+  } catch { return null; }
+}
+
 // Twitch: 追加
-function cbTwAdd() {
+async function cbTwAdd() {
   const username = document.getElementById('cb-tw-input').value.trim().toLowerCase();
   if (!username) return;
   if (!/^[a-z0-9_]{1,25}$/.test(username)) { cbSetStatus('無効なチャンネル名です', 'error'); return; }
 
   if (!cbFavorites.twitch.some(c => c.username === username)) {
-    cbFavorites.twitch.push({ username });
+    const thumbnailUrl = await cbFetchTwitchThumbnail(username);
+    cbFavorites.twitch.push({ username, thumbnailUrl });
     cbSave();
   }
   document.getElementById('cb-tw-input').value = '';
