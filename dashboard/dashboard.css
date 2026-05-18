@@ -592,6 +592,11 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 
   .channel-browser { width: 100%; }
 
+  /* チャンネルブラウザ: はみ出し防止 */
+  .cb-pane      { overflow-x: hidden; }
+  .cb-actions   { flex-shrink: 1; }
+  .cb-panel-row { flex-wrap: wrap; }
+
   /* トップバー: コンパクト化 */
   .app-title { font-size: 12px; }
   .topbar { height: auto; padding: 5px 10px; gap: 4px; flex-wrap: wrap; }
