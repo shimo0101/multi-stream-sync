@@ -213,6 +213,7 @@
       width: 40px; height: 40px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       font-size: 17px; font-weight: 700; color: #fff; flex-shrink: 0;
+      object-fit: cover;
     }
 
     .tw-name { font-size: 13px; font-weight: 600; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -790,9 +791,13 @@
 
         const card = document.createElement('div');
         card.className = 'tw-card';
+        const avatarHtml = ch.thumbnailUrl
+          ? `<img class="tw-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
+          : `<div class="tw-avatar" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>`;
+
         card.innerHTML = `
           <div class="tw-card-inner">
-            <div class="tw-avatar" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>
+            ${avatarHtml}
             <div>
               <div class="tw-name">${escHtml(ch.username)}</div>
               <div class="tw-platform">Twitch</div>
