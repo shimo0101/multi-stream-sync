@@ -91,7 +91,27 @@
     .btn-yt-search:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* ===== Channel filter chips (YouTube) ===== */
-    .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .chip-section-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px;
+    }
+    .chip-section-label { font-size: 11px; color: #4b5563; white-space: nowrap; }
+    .btn-chip-toggle {
+      padding: 2px 8px;
+      background: transparent; border: 1px solid #2a2a3a; border-radius: 4px;
+      color: #6b7280; font-size: 11px;
+      cursor: pointer; transition: color 0.1s, border-color 0.1s; white-space: nowrap;
+    }
+    .btn-chip-toggle:hover { color: #a78bfa; border-color: #4a4a6a; }
+
+    .chip-collapsible {
+      overflow: hidden;
+      max-height: 200px;
+      transition: max-height 0.25s ease;
+    }
+    .chip-collapsible.is-collapsed { max-height: 0; }
+
+    .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 
     .chip {
       display: inline-flex; align-items: center; gap: 5px;
@@ -396,7 +416,13 @@
         <input type="text" id="q" class="search-input" placeholder="キーワードを入力…" autocomplete="off">
         <button class="btn-yt-search" id="btn-search">検索</button>
       </div>
-      <div class="chip-row" id="chip-row"></div>
+      <div class="chip-section-header">
+        <span class="chip-section-label">チャンネル絞り込み</span>
+        <button id="btn-chip-toggle" class="btn-chip-toggle">▼</button>
+      </div>
+      <div class="chip-collapsible" id="chip-section">
+        <div class="chip-row" id="chip-row"></div>
+      </div>
       <!-- YouTube のタブ分類に準拠: 動画 / ライブ中 / アーカイブ / ショート -->
       <div class="filter-row">
         <span class="filter-label">絞り込み:</span>
@@ -497,6 +523,14 @@
     let twVodNextCursor    = null;
     let twVodCursorHistory = [];
     let twVodPage          = 1;
+
+    // ===== Chip section collapse =====
+    let chipCollapsed = localStorage.getItem('mss-chip-collapsed') === '1';
+
+    function applyChipToggle() {
+      document.getElementById('chip-section').classList.toggle('is-collapsed', chipCollapsed);
+      document.getElementById('btn-chip-toggle').textContent = chipCollapsed ? '▶' : '▼';
+    }
 
     // ===== State =====
     let activePtab      = 'youtube';
@@ -1184,6 +1218,12 @@
 
     // ===== YouTube event wiring =====
 
+    document.getElementById('btn-chip-toggle').addEventListener('click', () => {
+      chipCollapsed = !chipCollapsed;
+      localStorage.setItem('mss-chip-collapsed', chipCollapsed ? '1' : '0');
+      applyChipToggle();
+    });
+
     document.getElementById('btn-search').addEventListener('click', resetAndSearch);
     document.getElementById('q').addEventListener('keydown', e => {
       if (e.key === 'Enter') resetAndSearch();
@@ -1206,6 +1246,7 @@
     const initTab = _justAuthed ? 'twitch' : (new URLSearchParams(location.search).get('tab') || 'youtube');
     switchTab(initTab);
     renderChips();
+    applyChipToggle();
 
     const statusEl = document.getElementById('api-status');
     if (apiKey) {
