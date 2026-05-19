@@ -916,7 +916,7 @@ function cbLoad() {
     const stored = JSON.parse(localStorage.getItem(CB_STORAGE_KEY) || '{}');
     cbFavorites = {
       youtube: (stored.youtube ?? []).map(ch => ({ ...ch, liveVideoId: null, liveTitle: null })),
-      twitch:  stored.twitch ?? [],
+      twitch:  (stored.twitch  ?? []).map(ch => ({ ...ch, isLive: false, liveTitle: null })),
     };
   } catch {
     cbFavorites = { youtube: [], twitch: [] };
@@ -1052,14 +1052,18 @@ function cbRenderTwList() {
   }
   const last = cbFavorites.twitch.length - 1;
   list.innerHTML = cbFavorites.twitch.map((ch, i) => `
-    <li class="cb-item">
+    <li class="cb-item${ch.isLive ? ' is-live' : ''}">
       ${ch.thumbnailUrl
         ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
         : `<div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>`
       }
       <div class="cb-info">
         <div class="cb-name">${escHtml(ch.username)}</div>
-        <div class="cb-status">Twitch</div>
+        <div class="cb-status">
+          ${ch.isLive
+            ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
+            : 'Twitch'}
+        </div>
       </div>
       <div class="cb-actions">
         <div class="cb-panel-row">
@@ -1191,6 +1195,61 @@ async function cbTwAdd() {
 
 document.getElementById('cb-tw-add').addEventListener('click', cbTwAdd);
 document.getElementById('cb-tw-input').addEventListener('keydown', e => { if (e.key === 'Enter') cbTwAdd(); });
+
+// Twitch: ライブ確認
+async function cbFetchTwitchLiveStreams() {
+  const token    = localStorage.getItem('mss-tw-token');
+  const clientId = settings.twClientId;
+  if (!token || !clientId) return null;
+  const query = cbFavorites.twitch
+    .map(ch => `user_login=${encodeURIComponent(ch.username)}`).join('&');
+  try {
+    const res = await fetch(
+      `https://api.twitch.tv/helix/streams?${query}&first=100`,
+      { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': clientId } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.data ?? [];
+  } catch { return null; }
+}
+
+document.getElementById('cb-tw-live').addEventListener('click', async () => {
+  if (!cbFavorites.twitch.length) { cbSetStatus('チャンネルを追加してください', 'error'); return; }
+  if (!settings.twClientId || !localStorage.getItem('mss-tw-token')) {
+    cbSetStatus('Twitch Client ID と認証が必要です（動画ピッカーから認証してください）', 'error');
+    return;
+  }
+  const btn = document.getElementById('cb-tw-live');
+  btn.disabled = true;
+  btn.textContent = '確認中…';
+
+  const streams = await cbFetchTwitchLiveStreams();
+  if (streams === null) {
+    cbSetStatus('ライブ確認に失敗しました', 'error');
+  } else {
+    cbFavorites.twitch.forEach((_, i) => {
+      cbFavorites.twitch[i].isLive    = false;
+      cbFavorites.twitch[i].liveTitle = null;
+    });
+    for (const s of streams) {
+      const idx = cbFavorites.twitch.findIndex(
+        ch => ch.username.toLowerCase() === s.user_login.toLowerCase()
+      );
+      if (idx !== -1) {
+        cbFavorites.twitch[idx].isLive    = true;
+        cbFavorites.twitch[idx].liveTitle = s.title;
+      }
+    }
+    cbRenderTwList();
+    cbSetStatus(
+      `ライブ確認完了 — ${streams.length} チャンネルが配信中`,
+      streams.length > 0 ? 'ok' : 'info'
+    );
+  }
+  btn.disabled = false;
+  btn.textContent = 'ライブ確認';
+});
 
 // Twitch: アイコン一括更新
 document.getElementById('cb-tw-refresh').addEventListener('click', async () => {
