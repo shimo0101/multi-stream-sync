@@ -8,7 +8,8 @@ import { loadSettings, saveSettings } from '../scripts/storage.js';
 
 // ===== グローバル状態 =====
 
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+           || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const syncManager = new SyncManager();
 let settings = {};
 let panels   = [];      // PanelController[]
@@ -117,6 +118,9 @@ class PanelController {
   }
 
   setMuted(muted) {
+    if (!muted) {
+      panels.forEach((p, i) => { if (i !== this.idx) p.setMuted(true); });
+    }
     this.isMuted = muted;
     const btn = document.getElementById(`btn-mute-${this.idx}`);
     if (btn) {
