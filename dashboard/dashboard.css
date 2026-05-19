@@ -617,6 +617,32 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .cb-reorder-btn:hover:not(:disabled) { color: #a78bfa; border-color: #6d28d9; }
 .cb-reorder-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* ===== Live Sort Bar ===== */
+.cb-sort-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: #0a1a0a;
+  border: 1px solid #16a34a;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #86efac;
+  gap: 8px;
+}
+.btn-sort-reset {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid #16a34a;
+  border-radius: 4px;
+  color: #86efac;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-sort-reset:hover { background: #16a34a; color: #fff; }
+
 /* ===== Mute Button (player overlay) ===== */
 .btn--mute {
   position: absolute;

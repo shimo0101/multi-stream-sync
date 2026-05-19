@@ -909,7 +909,9 @@ init().catch(console.error);
 const CB_STORAGE_KEY = 'multi-stream-sync-favorites';
 
 // お気に入りデータ（ライブ状態はメモリのみ、永続化しない）
-let cbFavorites = { youtube: [], twitch: [] };
+let cbFavorites    = { youtube: [], twitch: [] };
+let cbYtLiveSorted = false;
+let cbTwLiveSorted = false;
 
 function cbLoad() {
   try {
@@ -1012,8 +1014,13 @@ function cbRenderYtList() {
     list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
     return;
   }
-  const last = cbFavorites.youtube.length - 1;
-  list.innerHTML = cbFavorites.youtube.map((ch, i) => `
+  const view = cbFavorites.youtube.map((ch, i) => ({ ...ch, origIdx: i }));
+  if (cbYtLiveSorted) view.sort((a, b) => (b.liveVideoId ? 1 : 0) - (a.liveVideoId ? 1 : 0));
+  const last    = view.length - 1;
+  const sortBar = cbYtLiveSorted
+    ? `<li><div class="cb-sort-bar">ライブ順で表示中 <button class="btn-sort-reset" data-reset-yt-sort>↺ 元の順序</button></div></li>`
+    : '';
+  list.innerHTML = sortBar + view.map((ch, vi) => `
     <li class="cb-item${ch.liveVideoId ? ' is-live' : ''}">
       ${ch.thumbnailUrl
         ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
@@ -1030,15 +1037,16 @@ function cbRenderYtList() {
       <div class="cb-actions">
         <div class="cb-panel-row">
           ${panels.map((_, pi) =>
-            `<button class="cb-open-btn" data-cb-yt-open="${i}" data-panel="${pi}"
+            `<button class="cb-open-btn" data-cb-yt-open="${ch.origIdx}" data-panel="${pi}"
                      ${ch.liveVideoId ? '' : 'disabled'}>P${pi + 1}</button>`
           ).join('')}
         </div>
+        ${!cbYtLiveSorted ? `
         <div class="cb-reorder-row">
-          <button class="cb-reorder-btn" data-cb-yt-up="${i}" ${i === 0    ? 'disabled' : ''}>↑</button>
-          <button class="cb-reorder-btn" data-cb-yt-down="${i}" ${i === last ? 'disabled' : ''}>↓</button>
-        </div>
-        <button class="cb-del-btn" data-cb-yt-del="${i}">✕</button>
+          <button class="cb-reorder-btn" data-cb-yt-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
+          <button class="cb-reorder-btn" data-cb-yt-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
+        </div>` : ''}
+        <button class="cb-del-btn" data-cb-yt-del="${ch.origIdx}">✕</button>
       </div>
     </li>
   `).join('');
@@ -1050,8 +1058,13 @@ function cbRenderTwList() {
     list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
     return;
   }
-  const last = cbFavorites.twitch.length - 1;
-  list.innerHTML = cbFavorites.twitch.map((ch, i) => `
+  const view = cbFavorites.twitch.map((ch, i) => ({ ...ch, origIdx: i }));
+  if (cbTwLiveSorted) view.sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0));
+  const last    = view.length - 1;
+  const sortBar = cbTwLiveSorted
+    ? `<li><div class="cb-sort-bar">ライブ順で表示中 <button class="btn-sort-reset" data-reset-tw-sort>↺ 元の順序</button></div></li>`
+    : '';
+  list.innerHTML = sortBar + view.map((ch, vi) => `
     <li class="cb-item${ch.isLive ? ' is-live' : ''}">
       ${ch.thumbnailUrl
         ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
@@ -1068,14 +1081,15 @@ function cbRenderTwList() {
       <div class="cb-actions">
         <div class="cb-panel-row">
           ${panels.map((_, pi) =>
-            `<button class="cb-open-btn" data-cb-tw-open="${i}" data-panel="${pi}">P${pi + 1}</button>`
+            `<button class="cb-open-btn" data-cb-tw-open="${ch.origIdx}" data-panel="${pi}">P${pi + 1}</button>`
           ).join('')}
         </div>
+        ${!cbTwLiveSorted ? `
         <div class="cb-reorder-row">
-          <button class="cb-reorder-btn" data-cb-tw-up="${i}" ${i === 0    ? 'disabled' : ''}>↑</button>
-          <button class="cb-reorder-btn" data-cb-tw-down="${i}" ${i === last ? 'disabled' : ''}>↓</button>
-        </div>
-        <button class="cb-del-btn" data-cb-tw-del="${i}">✕</button>
+          <button class="cb-reorder-btn" data-cb-tw-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
+          <button class="cb-reorder-btn" data-cb-tw-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
+        </div>` : ''}
+        <button class="cb-del-btn" data-cb-tw-del="${ch.origIdx}">✕</button>
       </div>
     </li>
   `).join('');
@@ -1153,6 +1167,7 @@ document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
     cbFavorites.youtube[i].liveTitle   = live?.title   ?? null;
   }));
 
+  cbYtLiveSorted = true;
   cbRenderYtList();
   btn.disabled = false;
   btn.textContent = 'ライブ確認';
@@ -1241,6 +1256,7 @@ document.getElementById('cb-tw-live').addEventListener('click', async () => {
         cbFavorites.twitch[idx].liveTitle = s.title;
       }
     }
+    cbTwLiveSorted = true;
     cbRenderTwList();
     cbSetStatus(
       `ライブ確認完了 — ${streams.length} チャンネルが配信中`,
@@ -1277,6 +1293,10 @@ document.getElementById('cb-tw-refresh').addEventListener('click', async () => {
 
 // YouTube リスト: 並び替え・削除・パネル展開（イベント委任）
 document.getElementById('cb-yt-list').addEventListener('click', (e) => {
+  if (e.target.closest('[data-reset-yt-sort]')) {
+    cbYtLiveSorted = false; cbRenderYtList(); return;
+  }
+
   const upIdx = e.target.dataset.cbYtUp;
   if (upIdx != null) {
     const i = Number(upIdx);
@@ -1293,6 +1313,7 @@ document.getElementById('cb-yt-list').addEventListener('click', (e) => {
 
   const delIdx = e.target.dataset.cbYtDel;
   if (delIdx != null) {
+    cbYtLiveSorted = false;
     cbFavorites.youtube.splice(Number(delIdx), 1);
     cbSave();
     cbRenderYtList();
@@ -1315,6 +1336,10 @@ document.getElementById('cb-yt-list').addEventListener('click', (e) => {
 
 // Twitch リスト: 並び替え・削除・パネル展開（イベント委任）
 document.getElementById('cb-tw-list').addEventListener('click', (e) => {
+  if (e.target.closest('[data-reset-tw-sort]')) {
+    cbTwLiveSorted = false; cbRenderTwList(); return;
+  }
+
   const upIdx = e.target.dataset.cbTwUp;
   if (upIdx != null) {
     const i = Number(upIdx);
@@ -1331,6 +1356,7 @@ document.getElementById('cb-tw-list').addEventListener('click', (e) => {
 
   const delIdx = e.target.dataset.cbTwDel;
   if (delIdx != null) {
+    cbTwLiveSorted = false;
     cbFavorites.twitch.splice(Number(delIdx), 1);
     cbSave();
     cbRenderTwList();
