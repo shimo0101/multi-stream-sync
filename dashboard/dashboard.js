@@ -8,6 +8,7 @@ import { loadSettings, saveSettings } from '../scripts/storage.js';
 
 // ===== グローバル状態 =====
 
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 const syncManager = new SyncManager();
 let settings = {};
 let panels   = [];      // PanelController[]
@@ -93,6 +94,7 @@ function createPanelHTML(idx) {
       <div class="player-wrap">
         <div id="player-${idx}" class="player-target"></div>
         <canvas id="canvas-${idx}" class="comment-layer" aria-hidden="true"></canvas>
+        <button id="btn-mute-${idx}" class="btn--mute" title="ミュート">🔊</button>
       </div>
     </section>`;
 }
@@ -111,6 +113,18 @@ class PanelController {
     this._twPlayer = null;
     this._ytChat   = null;
     this._twChat   = null;
+    this.isMuted   = isIOS;
+  }
+
+  setMuted(muted) {
+    this.isMuted = muted;
+    const btn = document.getElementById(`btn-mute-${this.idx}`);
+    if (btn) {
+      btn.textContent = muted ? '🔇' : '🔊';
+      btn.classList.toggle('is-muted', muted);
+      btn.title = muted ? 'ミュート解除' : 'ミュート';
+    }
+    this.player?.setMuted(muted);
   }
 
   get player() { return this.platform === 'youtube' ? this._ytPlayer : this._twPlayer; }
@@ -219,7 +233,7 @@ class PanelController {
       this._ytChat?.isRunning() && this._ytChat.stop();
       document.getElementById(`btn-chat-${this.idx}`).disabled = true;
       this.loadedId = videoId;
-      player.load(videoId);
+      player.load(videoId, { muted: this.isMuted });
       syncManager.registerPlayer(`p${this.idx}`, player);
       setStatus(`P${this.idx + 1} YouTube: "${videoId}" を読み込み中…`);
     } else {
@@ -234,7 +248,7 @@ class PanelController {
       this._twChat?.isConnected() && this._twChat.disconnect();
       document.getElementById(`btn-chat-${this.idx}`).disabled = true;
       this.loadedId = parsed.type === 'channel' ? parsed.id : null;
-      player.load(parsed.id, parsed.type);
+      player.load(parsed.id, parsed.type, { muted: this.isMuted });
       syncManager.registerPlayer(`p${this.idx}`, player);
       setStatus(`P${this.idx + 1} Twitch: "${parsed.id}" を読み込み中…`);
     }
@@ -416,6 +430,11 @@ function bindPanelEvents(idx) {
     btn.addEventListener('click', () => panels[idx].adjustStartTime(Number(btn.dataset.delta)));
   });
 
+  // ミュートボタン
+  document.getElementById(`btn-mute-${idx}`).addEventListener('click', () => {
+    panels[idx].setMuted(!panels[idx].isMuted);
+  });
+
   // 折りたたみボタン
   document.getElementById(`btn-collapse-${idx}`).addEventListener('click', () => {
     const config    = document.getElementById(`panel-config-${idx}`);
@@ -424,6 +443,9 @@ function bindPanelEvents(idx) {
     btn.textContent = collapsed ? '▼' : '▲';
     btn.title = collapsed ? 'ツールバーを展開' : 'ツールバーを折りたたむ';
   });
+
+  // iOS: 初期ミュート状態をボタン UI に反映
+  if (isIOS) panels[idx].setMuted(true);
 
   // モバイル（幅 640px 以下）ではデフォルトでツールバーを折りたたむ
   if (window.matchMedia('(max-width: 640px)').matches) {

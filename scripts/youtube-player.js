@@ -27,7 +27,7 @@ export class YouTubePlayer {
     });
   }
 
-  load(videoId) {
+  load(videoId, { muted = false } = {}) {
     const container = document.getElementById(this.#containerId);
     if (!container) return;
 
@@ -43,6 +43,7 @@ export class YouTubePlayer {
 
     const url = new URL(this.#relayUrl);
     url.searchParams.set('v', videoId);
+    if (muted) url.searchParams.set('muted', '1');
 
     const iframe = document.createElement('iframe');
     iframe.src           = url.toString();
@@ -56,6 +57,10 @@ export class YouTubePlayer {
 
   seekTo(seconds) {
     this.#post({ type: 'ytSeek', data: { time: Math.max(0, seconds) } });
+  }
+
+  setMuted(muted) {
+    this.#post({ type: muted ? 'ytMute' : 'ytUnmute' });
   }
 
   isReady() { return this.#ready; }

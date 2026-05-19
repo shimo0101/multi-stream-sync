@@ -44,8 +44,9 @@
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
     let player = null;
-    const params  = new URLSearchParams(location.search);
-    const videoId = params.get('v');
+    const params   = new URLSearchParams(location.search);
+    const videoId  = params.get('v');
+    const isMuted  = params.get('muted') === '1';
 
     function showError(msg) {
       const el = document.getElementById('error');
@@ -63,6 +64,7 @@
         playerVars: { controls: 1, rel: 0, autoplay: 0, playsinline: 1 },
         events: {
           onReady() {
+            if (isMuted) player.mute();
             window.parent.postMessage({ type: 'ytReady' }, '*');
             // 500ms ごとに現在位置を親へ送信
             setInterval(() => {
@@ -86,9 +88,11 @@
       if (!player) return;
       const { type, data } = e.data || {};
       switch (type) {
-        case 'ytSeek':  player.seekTo(Math.max(0, data?.time ?? 0), true); break;
-        case 'ytPlay':  player.playVideo();  break;
-        case 'ytPause': player.pauseVideo(); break;
+        case 'ytSeek':   player.seekTo(Math.max(0, data?.time ?? 0), true); break;
+        case 'ytPlay':   player.playVideo();  break;
+        case 'ytPause':  player.pauseVideo(); break;
+        case 'ytMute':   player.mute();       break;
+        case 'ytUnmute': player.unMute();     break;
       }
     });
   </script>

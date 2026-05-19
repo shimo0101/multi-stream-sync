@@ -30,8 +30,8 @@ export class TwitchPlayer {
     if (relayUrl) this.#setupMsgListener();
   }
 
-  load(id, type = 'channel') {
-    this.#mode === 'relay' ? this.#loadRelay(id, type) : this.#loadSdk(id, type);
+  load(id, type = 'channel', { muted = false } = {}) {
+    this.#mode === 'relay' ? this.#loadRelay(id, type, muted) : this.#loadSdk(id, type, muted);
   }
 
   getCurrentTime() {
@@ -46,6 +46,14 @@ export class TwitchPlayer {
       this.#postToRelay({ type: 'seek', data: { time: t } });
     } else {
       this.#sdk?.seek(t);
+    }
+  }
+
+  setMuted(muted) {
+    if (this.#mode === 'relay') {
+      this.#postToRelay({ type: muted ? 'mute' : 'unmute' });
+    } else {
+      this.#sdk?.setMuted(muted);
     }
   }
 
@@ -64,16 +72,16 @@ export class TwitchPlayer {
 
   // ===== SDK モード =====
 
-  #loadSdk(id, type) {
-    if (window.Twitch?.Player) { this.#createSdkPlayer(id, type); return; }
+  #loadSdk(id, type, muted = false) {
+    if (window.Twitch?.Player) { this.#createSdkPlayer(id, type, muted); return; }
     const s = document.createElement('script');
     s.src = 'https://player.twitch.tv/js/embed/v1.js';
-    s.onload = () => this.#createSdkPlayer(id, type);
+    s.onload = () => this.#createSdkPlayer(id, type, muted);
     document.head.appendChild(s);
   }
 
-  #createSdkPlayer(id, type) {
-    const options = { width: '100%', height: '100%', autoplay: false, parent: [this.#parent] };
+  #createSdkPlayer(id, type, muted = false) {
+    const options = { width: '100%', height: '100%', autoplay: false, muted, parent: [this.#parent] };
     if (type === 'channel') options.channel = id;
     else                    options.video   = id.replace(/^v/, '');
     this.#sdk = new Twitch.Player(this.#containerId, options);
@@ -97,7 +105,7 @@ export class TwitchPlayer {
     window.addEventListener('message', this.#msgHandler);
   }
 
-  #loadRelay(id, type) {
+  #loadRelay(id, type, muted = false) {
     const container = document.getElementById(this.#containerId);
     if (!container) return;
 
@@ -110,6 +118,7 @@ export class TwitchPlayer {
     const url = new URL(this.#relayUrl);
     if (type === 'channel') url.searchParams.set('channel', id);
     else                    url.searchParams.set('video',   id);
+    if (muted) url.searchParams.set('muted', '1');
 
     const iframe = document.createElement('iframe');
     iframe.src           = url.toString();
