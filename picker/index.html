@@ -272,11 +272,21 @@
 
     .tw-vod-hint { font-size: 11px; color: #374151; line-height: 1.5; }
 
+    .tw-favorites-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
     .tw-favorites-label {
       font-size: 11px; font-weight: 700;
       color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em;
-      margin-bottom: 8px;
     }
+    .tw-ch-collapsible {
+      overflow: hidden;
+      max-height: 3000px;
+      transition: max-height 0.3s ease, opacity 0.25s ease;
+      opacity: 1;
+    }
+    .tw-ch-collapsible.is-collapsed { max-height: 0; opacity: 0; }
 
     /* ===== Panel buttons (shared) ===== */
     .video-panel-row {
@@ -480,8 +490,13 @@
 
       <!-- チャンネル一覧ビュー -->
       <div id="tw-channels-view">
-        <div class="tw-favorites-label">お気に入りチャンネル</div>
-        <div id="tw-results"></div>
+        <div class="tw-favorites-header">
+          <div class="tw-favorites-label">お気に入りチャンネル</div>
+          <button id="btn-tw-ch-toggle" class="btn-chip-toggle">▼</button>
+        </div>
+        <div class="tw-ch-collapsible" id="tw-ch-section">
+          <div id="tw-results"></div>
+        </div>
       </div>
 
       <!-- VOD 一覧ビュー（チャンネル選択後） -->
@@ -524,12 +539,20 @@
     let twVodCursorHistory = [];
     let twVodPage          = 1;
 
-    // ===== Chip section collapse =====
+    // ===== Chip section collapse (YouTube) =====
     let chipCollapsed = localStorage.getItem('mss-chip-collapsed') === '1';
 
     function applyChipToggle() {
       document.getElementById('chip-section').classList.toggle('is-collapsed', chipCollapsed);
       document.getElementById('btn-chip-toggle').textContent = chipCollapsed ? '▶' : '▼';
+    }
+
+    // ===== Twitch channel list collapse =====
+    let twChCollapsed = localStorage.getItem('mss-tw-ch-collapsed') === '1';
+
+    function applyTwChToggle() {
+      document.getElementById('tw-ch-section').classList.toggle('is-collapsed', twChCollapsed);
+      document.getElementById('btn-tw-ch-toggle').textContent = twChCollapsed ? '▶' : '▼';
     }
 
     // ===== State =====
@@ -1224,6 +1247,12 @@
       applyChipToggle();
     });
 
+    document.getElementById('btn-tw-ch-toggle').addEventListener('click', () => {
+      twChCollapsed = !twChCollapsed;
+      localStorage.setItem('mss-tw-ch-collapsed', twChCollapsed ? '1' : '0');
+      applyTwChToggle();
+    });
+
     document.getElementById('btn-search').addEventListener('click', resetAndSearch);
     document.getElementById('q').addEventListener('keydown', e => {
       if (e.key === 'Enter') resetAndSearch();
@@ -1247,6 +1276,7 @@
     switchTab(initTab);
     renderChips();
     applyChipToggle();
+    applyTwChToggle();
 
     const statusEl = document.getElementById('api-status');
     if (apiKey) {
