@@ -55,6 +55,9 @@ export class YouTubePlayer {
 
   getCurrentTime() { return this.#ready ? this.#cachedTime : null; }
 
+  play()  { this.#post({ type: 'ytPlay'  }); }
+  pause() { this.#post({ type: 'ytPause' }); }
+
   seekTo(seconds) {
     this.#post({ type: 'ytSeek', data: { time: Math.max(0, seconds) } });
   }

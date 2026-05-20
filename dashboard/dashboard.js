@@ -826,6 +826,18 @@ document.getElementById('btn-load-all').addEventListener('click', () => {
   else setStatus(`${loaded} パネルを読み込み中…`);
 });
 
+// 全再生ボタン
+document.getElementById('btn-play-all').addEventListener('click', () => {
+  let played = 0;
+  panels.forEach(p => {
+    if (!p.player?.isReady()) return;
+    p.player.play();
+    played++;
+  });
+  if (played === 0) setStatus('再生できるパネルがありません（動画を読み込んでください）', 'error');
+  else setStatus(`${played} パネルを再生しました`);
+});
+
 // 全チャット開始ボタン
 document.getElementById('btn-chat-all').addEventListener('click', () => {
   let started = 0;

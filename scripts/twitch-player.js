@@ -40,6 +40,16 @@ export class TwitchPlayer {
       : (this.#sdk?.getCurrentTime() ?? null);
   }
 
+  play() {
+    if (this.#mode === 'relay') this.#postToRelay({ type: 'play' });
+    else                        this.#sdk?.play();
+  }
+
+  pause() {
+    if (this.#mode === 'relay') this.#postToRelay({ type: 'pause' });
+    else                        this.#sdk?.pause();
+  }
+
   seekTo(seconds) {
     const t = Math.max(0, seconds);
     if (this.#mode === 'relay') {
