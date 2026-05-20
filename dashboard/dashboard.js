@@ -846,10 +846,19 @@ document.getElementById('btn-chat-all').addEventListener('click', () => {
   else setStatus(`${started} パネルのチャットを開始しました`, 'ok');
 });
 
-// ⛶ 全画面トグル（アプリ UI）
+// ⛶ 全画面トグル（アプリ UI + ブラウザ全画面を連動）
 function setFullscreen(on) {
   document.body.classList.toggle('is-fullscreen', on);
-  if (on) cbClose();
+  if (on) {
+    cbClose();
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  } else {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
 }
 
 document.getElementById('btn-fullscreen').addEventListener('click', () => {
@@ -884,6 +893,10 @@ if (!document.fullscreenEnabled) {
 
   document.addEventListener('fullscreenchange', () => {
     btnNativeFs.classList.toggle('is-open', !!document.fullscreenElement);
+    // ブラウザ側でフルスクリーンが解除されたとき（Android の戻るボタン等）UI も追従
+    if (!document.fullscreenElement) {
+      document.body.classList.remove('is-fullscreen');
+    }
   });
 }
 
