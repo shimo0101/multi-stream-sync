@@ -63,6 +63,10 @@ export class YouTubePlayer {
     this.#post({ type: muted ? 'ytMute' : 'ytUnmute' });
   }
 
+  setVolume(vol) {
+    this.#post({ type: 'ytSetVolume', data: { volume: Math.round(Math.max(0, Math.min(100, vol))) } });
+  }
+
   isReady() { return this.#ready; }
 
   setRelayUrl(url) { this.#relayUrl = url; }

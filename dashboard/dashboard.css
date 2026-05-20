@@ -668,6 +668,37 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .btn--mute.is-muted { background: rgba(180, 0, 0, 0.7); border-color: #dc2626; color: #fca5a5; }
 .btn--mute.is-muted:hover { background: rgba(220, 38, 38, 0.85); }
 
+/* ===== Volume bar (Android) ===== */
+.volume-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 50px;
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 5px 10px;
+  backdrop-filter: blur(4px);
+}
+.volume-range {
+  flex: 1;
+  height: 4px;
+  accent-color: #a78bfa;
+  cursor: pointer;
+  min-width: 0;
+}
+.volume-label {
+  font-size: 11px;
+  color: #e0e0e0;
+  white-space: nowrap;
+  min-width: 34px;
+  text-align: right;
+}
+
 /* ===== Topbar row break (mobile only) ===== */
 .tb-break { display: none; }
 

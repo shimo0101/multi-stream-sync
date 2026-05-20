@@ -88,11 +88,12 @@
       if (!player) return;
       const { type, data } = e.data || {};
       switch (type) {
-        case 'ytSeek':   player.seekTo(Math.max(0, data?.time ?? 0), true); break;
-        case 'ytPlay':   player.playVideo();  break;
-        case 'ytPause':  player.pauseVideo(); break;
-        case 'ytMute':   player.mute();       break;
-        case 'ytUnmute': player.unMute();     break;
+        case 'ytSeek':      player.seekTo(Math.max(0, data?.time ?? 0), true); break;
+        case 'ytPlay':      player.playVideo();  break;
+        case 'ytPause':     player.pauseVideo(); break;
+        case 'ytMute':      player.mute();       break;
+        case 'ytUnmute':    player.unMute();     break;
+        case 'ytSetVolume': player.setVolume(Math.max(0, Math.min(100, data?.volume ?? 100))); break;
       }
     });
   </script>

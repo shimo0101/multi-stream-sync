@@ -8,8 +8,9 @@ import { loadSettings, saveSettings } from '../scripts/storage.js';
 
 // ===== グローバル状態 =====
 
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-           || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isIOS     = /iPad|iPhone|iPod/.test(navigator.userAgent)
+               || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/i.test(navigator.userAgent);
 const syncManager = new SyncManager();
 let settings = {};
 let panels   = [];      // PanelController[]
@@ -96,6 +97,11 @@ function createPanelHTML(idx) {
         <div id="player-${idx}" class="player-target"></div>
         <canvas id="canvas-${idx}" class="comment-layer" aria-hidden="true"></canvas>
         <button id="btn-mute-${idx}" class="btn--mute" title="ミュート">🔊</button>
+        <div class="volume-bar" id="vol-bar-${idx}" hidden>
+          <input type="range" class="volume-range" id="vol-range-${idx}"
+                 min="0" max="100" step="10" value="100">
+          <span class="volume-label" id="vol-label-${idx}">100%</span>
+        </div>
       </div>
     </section>`;
 }
@@ -129,6 +135,12 @@ class PanelController {
       btn.title = muted ? 'ミュート解除' : 'ミュート';
     }
     this.player?.setMuted(muted);
+  }
+
+  setVolume(vol) {
+    if (this.platform === 'youtube' && this._ytPlayer) {
+      this._ytPlayer.setVolume(vol);
+    }
   }
 
   get player() { return this.platform === 'youtube' ? this._ytPlayer : this._twPlayer; }
@@ -450,6 +462,17 @@ function bindPanelEvents(idx) {
 
   // iOS: 初期ミュート状態をボタン UI に反映
   if (isIOS) panels[idx].setMuted(true);
+
+  // Android: 音量スライダーを表示
+  if (isAndroid) {
+    document.getElementById(`btn-mute-${idx}`).hidden = true;
+    document.getElementById(`vol-bar-${idx}`).hidden = false;
+    document.getElementById(`vol-range-${idx}`).addEventListener('input', e => {
+      const vol = Number(e.target.value);
+      document.getElementById(`vol-label-${idx}`).textContent = vol + '%';
+      panels[idx].setVolume(vol);
+    });
+  }
 
   // モバイル（幅 640px 以下）ではデフォルトでツールバーを折りたたむ
   if (window.matchMedia('(max-width: 640px)').matches) {
