@@ -13,6 +13,7 @@
       color: #e0e0e0;
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       font-size: 14px;
+      overflow-x: hidden;
     }
 
     /* ===== Sticky header ===== */
@@ -236,7 +237,12 @@
       object-fit: cover;
     }
 
-    .tw-name { font-size: 13px; font-weight: 600; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tw-info { min-width: 0; }
+    .tw-name {
+      font-size: 13px; font-weight: 600; color: #e0e0e0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; overflow-wrap: anywhere;
+    }
     .tw-platform { font-size: 11px; color: #6441a5; margin-top: 2px; }
 
     .tw-actions { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
@@ -855,7 +861,7 @@
         card.innerHTML = `
           <div class="tw-card-inner">
             ${avatarHtml}
-            <div>
+            <div class="tw-info">
               <div class="tw-name">${escHtml(ch.username)}</div>
               <div class="tw-platform">Twitch</div>
             </div>
