@@ -67,6 +67,15 @@ export class TwitchPlayer {
     }
   }
 
+  setVolume(vol) {
+    const v = Math.max(0, Math.min(1, vol / 100));
+    if (this.#mode === 'relay') {
+      this.#postToRelay({ type: 'setVolume', data: { volume: v } });
+    } else {
+      this.#sdk?.setVolume(v);
+    }
+  }
+
   isReady() {
     return this.#mode === 'relay' ? this.#relayReady : this.#sdk !== null;
   }

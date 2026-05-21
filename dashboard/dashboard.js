@@ -8,9 +8,14 @@ import { loadSettings, saveSettings } from '../scripts/storage.js';
 
 // ===== グローバル状態 =====
 
-const isIOS     = /iPad|iPhone|iPod/.test(navigator.userAgent)
-               || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isAndroid = /Android/i.test(navigator.userAgent);
+const isIOS     = !isAndroid && (
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1
+    && /Safari\//.test(navigator.userAgent)
+    && !/Chrome\//.test(navigator.userAgent)
+    && !/Firefox\//.test(navigator.userAgent))
+);
 const syncManager = new SyncManager();
 let settings = {};
 let panels   = [];      // PanelController[]
@@ -124,7 +129,7 @@ class PanelController {
   }
 
   setMuted(muted) {
-    if (!muted) {
+    if (isIOS && !muted) {
       panels.forEach((p, i) => { if (i !== this.idx) p.setMuted(true); });
     }
     this.isMuted = muted;
@@ -138,9 +143,7 @@ class PanelController {
   }
 
   setVolume(vol) {
-    if (this.platform === 'youtube' && this._ytPlayer) {
-      this._ytPlayer.setVolume(vol);
-    }
+    this.player?.setVolume(vol);
   }
 
   get player() { return this.platform === 'youtube' ? this._ytPlayer : this._twPlayer; }
@@ -446,10 +449,21 @@ function bindPanelEvents(idx) {
     btn.addEventListener('click', () => panels[idx].adjustStartTime(Number(btn.dataset.delta)));
   });
 
-  // ミュートボタン
-  document.getElementById(`btn-mute-${idx}`).addEventListener('click', () => {
-    panels[idx].setMuted(!panels[idx].isMuted);
-  });
+  // iOS: ミュートトグル / PC・Android: 音量スライダートグル
+  const _muteBtn = document.getElementById(`btn-mute-${idx}`);
+  if (isIOS) {
+    _muteBtn.addEventListener('click', () => {
+      panels[idx].setMuted(!panels[idx].isMuted);
+    });
+  } else {
+    _muteBtn.textContent = '🔊';
+    _muteBtn.title = '音量調整';
+    _muteBtn.addEventListener('click', () => {
+      const volBar = document.getElementById(`vol-bar-${idx}`);
+      volBar.hidden = !volBar.hidden;
+      _muteBtn.classList.toggle('is-vol-open', !volBar.hidden);
+    });
+  }
 
   // 折りたたみボタン
   document.getElementById(`btn-collapse-${idx}`).addEventListener('click', () => {
@@ -463,14 +477,13 @@ function bindPanelEvents(idx) {
   // iOS: 初期ミュート状態をボタン UI に反映
   if (isIOS) panels[idx].setMuted(true);
 
-  // Android: 音量スライダーを表示
-  if (isAndroid) {
-    document.getElementById(`btn-mute-${idx}`).hidden = true;
-    document.getElementById(`vol-bar-${idx}`).hidden = false;
+  // PC・Android: 音量スライダーのイベント登録（表示はトグルボタンで制御）
+  if (!isIOS) {
     document.getElementById(`vol-range-${idx}`).addEventListener('input', e => {
       const vol = Number(e.target.value);
       document.getElementById(`vol-label-${idx}`).textContent = vol + '%';
       panels[idx].setVolume(vol);
+      if (vol > 0 && panels[idx].isMuted) panels[idx].setMuted(false);
     });
   }
 

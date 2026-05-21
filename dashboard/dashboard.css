@@ -667,6 +667,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .btn--mute:hover { background: rgba(0, 0, 0, 0.85); border-color: rgba(255, 255, 255, 0.3); }
 .btn--mute.is-muted { background: rgba(180, 0, 0, 0.7); border-color: #dc2626; color: #fca5a5; }
 .btn--mute.is-muted:hover { background: rgba(220, 38, 38, 0.85); }
+.btn--mute.is-vol-open { background: rgba(80, 60, 160, 0.75); border-color: #a78bfa; }
 
 /* ===== Volume bar (Android) ===== */
 .volume-bar {

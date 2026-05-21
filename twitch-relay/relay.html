@@ -94,8 +94,9 @@
             break;
           case 'play':   player.play();             break;
           case 'pause':  player.pause();            break;
-          case 'mute':   player.setMuted(true);     break;
-          case 'unmute': player.setMuted(false);    break;
+          case 'mute':      player.setMuted(true);                                        break;
+          case 'unmute':    player.setMuted(false);                                       break;
+          case 'setVolume': player.setVolume(Math.max(0, Math.min(1, data?.volume ?? 1))); break;
         }
       });
     }
