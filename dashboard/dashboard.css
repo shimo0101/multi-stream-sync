@@ -643,6 +643,14 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 }
 .btn-sort-reset:hover { background: #16a34a; color: #fff; }
 
+/* ===== Player Shield (スライダー表示中の iframe タッチ横取り防止) ===== */
+.player-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  touch-action: none;
+}
+
 /* ===== Mute Button (player overlay) ===== */
 .btn--mute {
   position: absolute;
@@ -692,6 +700,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   accent-color: #a78bfa;
   cursor: pointer;
   min-width: 0;
+  touch-action: none;
 }
 .volume-label {
   font-size: 11px;

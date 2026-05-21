@@ -101,6 +101,7 @@ function createPanelHTML(idx) {
       <div class="player-wrap">
         <div id="player-${idx}" class="player-target"></div>
         <canvas id="canvas-${idx}" class="comment-layer" aria-hidden="true"></canvas>
+        <div id="player-shield-${idx}" class="player-shield" hidden></div>
         <button id="btn-mute-${idx}" class="btn--mute" title="ミュート">🔊</button>
         <div class="volume-bar" id="vol-bar-${idx}" hidden>
           <input type="range" class="volume-range" id="vol-range-${idx}"
@@ -460,11 +461,10 @@ function bindPanelEvents(idx) {
     _muteBtn.title = '音量調整';
     _muteBtn.addEventListener('click', () => {
       const volBar  = document.getElementById(`vol-bar-${idx}`);
-      const iframe  = document.querySelector(`#player-${idx} iframe`);
-      volBar.hidden = !volBar.hidden;
+      const shield  = document.getElementById(`player-shield-${idx}`);
+      volBar.hidden  = !volBar.hidden;
+      shield.hidden  = volBar.hidden;  // スライダー表示中はシールドで iframe タッチを吸収
       _muteBtn.classList.toggle('is-vol-open', !volBar.hidden);
-      // スライダー表示中は iframe のタッチ横取りを防ぐ
-      if (iframe) iframe.style.pointerEvents = volBar.hidden ? '' : 'none';
     });
   }
 
