@@ -649,6 +649,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   bottom: 8px;
   left: 8px;
   z-index: 20;
+  touch-action: manipulation;
   width: 34px;
   height: 34px;
   background: rgba(0, 0, 0, 0.65);

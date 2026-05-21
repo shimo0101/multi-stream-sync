@@ -459,9 +459,12 @@ function bindPanelEvents(idx) {
     _muteBtn.textContent = '🔊';
     _muteBtn.title = '音量調整';
     _muteBtn.addEventListener('click', () => {
-      const volBar = document.getElementById(`vol-bar-${idx}`);
+      const volBar  = document.getElementById(`vol-bar-${idx}`);
+      const iframe  = document.querySelector(`#player-${idx} iframe`);
       volBar.hidden = !volBar.hidden;
       _muteBtn.classList.toggle('is-vol-open', !volBar.hidden);
+      // スライダー表示中は iframe のタッチ横取りを防ぐ
+      if (iframe) iframe.style.pointerEvents = volBar.hidden ? '' : 'none';
     });
   }
 
