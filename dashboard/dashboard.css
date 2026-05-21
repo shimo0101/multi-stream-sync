@@ -679,6 +679,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .btn--mute.is-vol-open { background: rgba(80, 60, 160, 0.75); border-color: #a78bfa; }
 
 /* ===== Volume bar (Android) ===== */
+.volume-bar[hidden] { display: none; }
 .volume-bar {
   position: absolute;
   bottom: 8px;
