@@ -408,6 +408,15 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 }
 .channel-browser.is-open { transform: translateX(0); }
 
+/* ===== Channel Browser Backdrop (mobile only) ===== */
+.cb-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 399; /* channel-browser(400) の直下 */
+}
+
 /* チャンネルブラウザ内ステータス（モバイルで底部が隠れる対策） */
 .cb-status-bar {
   padding: 6px 14px;
@@ -724,7 +733,9 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 
   .tb-break { display: block; flex-basis: 100%; height: 0; }
 
-  .channel-browser { width: 100%; }
+  /* 右から85%幅でスライドイン。左端の隙間でダッシュボードが見える */
+  .channel-browser { width: min(300px, 85vw); }
+  .cb-backdrop.is-open { display: block; }
 
   /* チャンネルブラウザ: はみ出し防止・余白最適化 */
   .cb-header    { padding: 8px 12px; }

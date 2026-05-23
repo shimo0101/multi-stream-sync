@@ -1164,17 +1164,20 @@ function cbOpen() {
   cbRenderTwList();
   document.getElementById('channel-browser').classList.add('is-open');
   document.getElementById('btn-browser').classList.add('is-open');
+  document.getElementById('cb-backdrop').classList.add('is-open');
 }
 
 function cbClose() {
   document.getElementById('channel-browser').classList.remove('is-open');
   document.getElementById('btn-browser').classList.remove('is-open');
+  document.getElementById('cb-backdrop').classList.remove('is-open');
 }
 
 // ブラウザ開閉
 document.getElementById('btn-browser').addEventListener('click', () => {
   document.getElementById('channel-browser').classList.contains('is-open') ? cbClose() : cbOpen();
 });
+document.getElementById('cb-backdrop').addEventListener('click', cbClose);
 document.getElementById('btn-cb-close').addEventListener('click', cbClose);
 
 // タブ切り替え
