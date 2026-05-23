@@ -731,11 +731,21 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   .cb-tab       { padding: 6px 8px; font-size: 12px; }
   .cb-pane      { overflow-x: hidden; padding: 8px; gap: 6px; }
   .cb-item      { padding: 6px 8px; gap: 6px; }
-  .cb-actions   { flex-shrink: 1; }
+  /* アクション列を固定幅にして info 列が過剰に広がるのを防ぐ */
+  .cb-actions   { width: 76px; flex-shrink: 0; }
   /* P1〜P4 を 2列グリッドに固定して横幅を抑える */
   .cb-panel-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
   .cb-open-btn  { padding: 2px 5px; font-size: 10px; text-align: center; }
   .cb-reorder-btn { padding: 2px 6px; font-size: 11px; }
+  /* 配信タイトルのみ最大2行折り返し（チャンネル名は1行見切れのまま） */
+  .cb-status {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: unset;
+  }
   /* アクション行ボタン: 高さ・フォントを最適化 */
   .cb-action-row .btn { font-size: 11px; padding: 5px 8px; min-height: 36px; }
   .cb-add-row .btn    { min-height: 36px; }
