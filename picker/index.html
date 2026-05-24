@@ -7,6 +7,8 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html { overflow-x: hidden; }
+
     body {
       min-height: 100vh;
       background: #0f0f13;
@@ -24,6 +26,8 @@
       background: #1a1a24;
       border-bottom: 1px solid #2a2a3a;
       padding: 12px 16px 10px;
+      width: 100%;
+      max-width: 100%;
     }
 
     .header-title {
@@ -41,12 +45,11 @@
 
     /* ===== Platform tabs ===== */
     .platform-tabs {
-      display: flex;
+      display: inline-flex;
       margin-bottom: 10px;
       border-radius: 7px;
       overflow: hidden;
       border: 1px solid #3a3a5a;
-      width: fit-content;
     }
 
     .platform-tab {
@@ -67,6 +70,7 @@
 
     .search-input {
       flex: 1;
+      min-width: 0;
       background: #1a1a2a;
       border: 1px solid #3a3a5a;
       border-radius: 6px;

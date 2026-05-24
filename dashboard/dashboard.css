@@ -2,7 +2,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ===== Base ===== */
-html { height: 100%; }
+html { height: 100%; overflow-x: hidden; }
 
 body {
   height: 100vh;
@@ -514,6 +514,9 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 
 .cb-action-row { display: flex; gap: 6px; }
 .cb-action-row .btn { font-size: 12px; padding: 5px 10px; flex: 1; }
+.cb-more-btn { flex: 0 !important; padding: 5px 10px !important; color: #6b7280; }
+.cb-secondary-row { display: flex; gap: 6px; }
+.cb-secondary-row .btn { font-size: 12px; padding: 5px 10px; }
 
 .cb-refresh-btn { font-size: 12px; padding: 5px 10px; align-self: flex-start; }
 
@@ -742,6 +745,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   .cb-tab       { padding: 6px 8px; font-size: 12px; }
   .cb-pane      { overflow-x: hidden; padding: 8px; gap: 6px; }
   .cb-item      { padding: 6px 8px; gap: 6px; }
+  .cb-avatar, .cb-avatar-initial { width: 28px; height: 28px; }
+  .cb-avatar-initial { font-size: 12px; }
   /* アクション列を固定幅にして info 列が過剰に広がるのを防ぐ */
   .cb-actions   { width: 76px; flex-shrink: 0; }
   /* P1〜P4 を 2列グリッドに固定して横幅を抑える */
@@ -757,7 +762,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
     overflow: hidden;
     text-overflow: unset;
   }
-  /* アクション行ボタン: 高さ・フォントを最適化 */
+  /* アクション行ボタン: 高さ・フォントを最適化、3ボタン時の折り返し */
+  .cb-action-row { flex-wrap: wrap; }
   .cb-action-row .btn { font-size: 11px; padding: 5px 8px; min-height: 36px; }
   .cb-add-row .btn    { min-height: 36px; }
   /* iOS auto-zoom 防止: 入力欄フォントを 16px に */
@@ -766,7 +772,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   /* トップバー: コンパクト化 */
   .app-title { font-size: 12px; }
   .topbar { height: auto; padding: calc(5px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 5px calc(10px + env(safe-area-inset-left)); gap: 4px; flex-wrap: wrap; }
-  .topbar-controls { gap: 4px; flex-wrap: wrap; }
+  /* width:100% で topbar 幅に制約（flex-shrink:0 の overflow 防止） */
+  .topbar-controls { gap: 4px; flex-wrap: wrap; width: 100%; }
 
   /* トップバー内ボタン: パネル内ボタンより小さく（視聴領域を優先） */
   .topbar-controls .btn         { padding: 5px 9px; font-size: 12px; min-height: 32px; }

@@ -1470,6 +1470,15 @@ document.getElementById('cb-tw-picker').addEventListener('click', () => {
   window.open(pickerUrl, 'mss-picker');
 });
 
+// Twitch: その他操作トグル（アイコン更新などを折りたたむ）
+document.getElementById('cb-tw-more').addEventListener('click', () => {
+  const sec = document.getElementById('cb-tw-secondary');
+  const btn = document.getElementById('cb-tw-more');
+  const opening = sec.hidden;
+  sec.hidden = !opening;
+  btn.textContent = opening ? '▲' : '▼';
+});
+
 // picker ページからの BroadcastChannel メッセージを受信
 try {
   const pickerBC = new BroadcastChannel('mss-picker');
