@@ -110,11 +110,13 @@
     .btn-chip-toggle:hover { color: #a78bfa; border-color: #4a4a6a; }
 
     .chip-collapsible {
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
       max-height: 200px;
       transition: max-height 0.25s ease;
     }
-    .chip-collapsible.is-collapsed { max-height: 0; }
+    .chip-collapsible.is-collapsed { max-height: 0; overflow: hidden; }
 
     .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 
