@@ -8,6 +8,8 @@
  *
  * ポーリング間隔: API レスポンスの pollingIntervalMillis に従う（最低5秒）。
  */
+const MAX_STAGGER_SEC = 4; // コメント間の間隔が空きすぎた場合の待機上限（秒）
+
 export class YouTubeChatClient {
   #apiKey;
   #liveChatId = null;
@@ -15,6 +17,9 @@ export class YouTubeChatClient {
   #seenIds = new Set();   // 初回取得時の既存メッセージを重複表示しない
   #timerId = null;
   #isFirstPoll = true;
+  #lastMessageTime = null;       // 直前に表示予定としたコメントの publishedAt
+  #nextDisplayAt = null;         // 次のコメントを表示してよい最短の時刻（ms epoch）。ポーリングをまたいで継続する
+  #pendingTimeouts = new Set();  // 秒数差分に応じて遅延表示待ちの setTimeout ID
   #onMessage;
   #onError;
   #onStatusChange;
@@ -64,6 +69,10 @@ export class YouTubeChatClient {
     this.#liveChatId  = null;
     this.#nextPageToken = null;
     this.#seenIds.clear();
+    this.#lastMessageTime = null;
+    this.#nextDisplayAt   = null;
+    for (const id of this.#pendingTimeouts) clearTimeout(id);
+    this.#pendingTimeouts.clear();
     this.#onStatusChange('idle');
   }
 
@@ -122,7 +131,12 @@ export class YouTubeChatClient {
         // 初回取得の既存メッセージはスキップ（画面が古いコメントで埋まらないように）
         for (const item of data.items ?? []) this.#seenIds.add(item.id);
         this.#isFirstPoll = false;
+        this.#lastMessageTime = new Date();
       } else {
+        // 1回のポーリングでまとめて届いた複数件を投稿時刻(publishedAt)の秒数差分で
+        // ずらして表示することで、一気にバースト表示されるのを防ぐ。
+        // #nextDisplayAt はポーリングをまたいで保持するため、次回の再読み込み時も
+        // 前回最後に表示予定としたコメントの続きからスケジュールされる（追い越し防止）。
         for (const item of data.items ?? []) {
           if (this.#seenIds.has(item.id)) continue;
           this.#seenIds.add(item.id);
@@ -135,7 +149,25 @@ export class YouTubeChatClient {
           const avatarUrl   = hasRole
             ? (item.authorDetails?.profileImageUrl ?? null)
             : null;
-          if (text) this.#onMessage({ text, isOwner, isModerator, isMember, avatarUrl });
+          if (!text) continue;
+
+          const publishedAt = item.snippet?.publishedAt ? new Date(item.snippet.publishedAt) : null;
+          let deltaSec = 0;
+          if (publishedAt && this.#lastMessageTime) {
+            deltaSec = Math.min(Math.max((publishedAt - this.#lastMessageTime) / 1000, 0), MAX_STAGGER_SEC);
+          }
+          if (publishedAt) this.#lastMessageTime = publishedAt;
+
+          const now = Date.now();
+          // 前回の続き（#nextDisplayAt）＋今回のギャップ。ただし過去にはならないよう now でクランプ
+          const displayAt = Math.max((this.#nextDisplayAt ?? now) + deltaSec * 1000, now);
+          this.#nextDisplayAt = displayAt;
+
+          const timeoutId = setTimeout(() => {
+            this.#pendingTimeouts.delete(timeoutId);
+            this.#onMessage({ text, isOwner, isModerator, isMember, avatarUrl });
+          }, displayAt - now);
+          this.#pendingTimeouts.add(timeoutId);
         }
       }
 
