@@ -133,6 +133,10 @@
 
     .chip-avatar { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; }
 
+    /* ===== Load button (channel / merged feed cache) ===== */
+    .load-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .load-status { font-size: 11px; color: #6b7280; }
+
     /* ===== Video type filter row (YouTube) ===== */
     .filter-row {
       display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
@@ -445,6 +449,11 @@
       <div class="chip-collapsible" id="chip-section">
         <div class="chip-row" id="chip-row"></div>
       </div>
+      <!-- チャンネル/まとめて選択時のみ表示: 手動読み込みボタン（クォータ節約のため自動取得しない） -->
+      <div class="load-row" id="load-row" hidden>
+        <button class="btn-yt-search" id="btn-load">📥 読み込み</button>
+        <span class="load-status" id="load-status"></span>
+      </div>
       <!-- YouTube のタブ分類に準拠: 動画 / ライブ中 / アーカイブ / ショート -->
       <div class="filter-row">
         <span class="filter-label">絞り込み:</span>
@@ -536,6 +545,11 @@
     const PANEL_COUNT  = 4;
     const MAX_RESULTS  = 20;
 
+    // チャンネル/まとめて読み込みキャッシュ関連
+    const PLAYLIST_PAGE_SIZE   = 50; // playlistItems.list の1回あたり取得件数
+    const MAX_AUTO_FETCH_PAGES = 10; // 1クリックで自動的に辿るページ数の上限（クォータ保護）
+    const MERGED_KEY           = '__merged__';
+
     let apiKey      = '';
     let ytFavorites = [];
     let twFavorites = [];
@@ -571,12 +585,18 @@
     let activePtab      = 'youtube';
     let activeChannelId = null;
     let activeFilter    = 'archive'; // 'video' | 'live' | 'archive' | 'short'
+    let feedMode        = 'all';     // 'all'（キーワード検索・都度API） | 'channel' | 'merged'（キャッシュ読み込み方式）
 
-    // Pagination
+    // Pagination（'all' モード = search.list のページトークン方式）
     let pageHistory   = [];   // tokens that were used to reach each page (for going back)
     let currentToken  = null; // token used to load the currently displayed page
     let nextPageToken = null; // token for the next page (from API response)
     let currentPage   = 1;
+
+    // 'channel' / 'merged' モード = 手動読み込み＆キャッシュ方式
+    // caches[key] = { items: [...正規化済み動画], loadedAt, exhausted, cursor, perChannel? }
+    let caches   = {};
+    let viewPage = 0; // キャッシュ内の表示ページ（0始まり）
 
     // ===== Load localStorage =====
 
@@ -593,6 +613,16 @@
       } catch {}
       twToken = localStorage.getItem(TW_TOKEN_KEY) || null;
     }
+
+    // お気に入りチャンネルが他タブ（ダッシュボード）で変更されたら、
+    // まとめてフィードのキャッシュは古いメンバー構成のままになるためクリアする
+    window.addEventListener('storage', e => {
+      if (e.key !== FAV_KEY) return;
+      loadStorage();
+      clearCache(MERGED_KEY);
+      renderChips();
+      if (feedMode === 'merged') renderCacheView();
+    });
 
     // ===== BroadcastChannel =====
 
@@ -786,19 +816,26 @@
       row.innerHTML = '';
 
       const allBtn = document.createElement('button');
-      allBtn.className = 'chip chip-all' + (activeChannelId === null ? ' is-active' : '');
+      allBtn.className = 'chip chip-all' + (feedMode === 'all' ? ' is-active' : '');
       allBtn.textContent = 'すべて';
       allBtn.addEventListener('click', () => {
-        if (activeChannelId === null) return;
-        activeChannelId = null;
-        renderChips();
-        resetAndSearch();
+        if (feedMode === 'all') return;
+        setFeedMode('all', null);
       });
       row.appendChild(allBtn);
 
+      const mergedBtn = document.createElement('button');
+      mergedBtn.className = 'chip chip-all' + (feedMode === 'merged' ? ' is-active' : '');
+      mergedBtn.textContent = '📅 まとめて';
+      mergedBtn.addEventListener('click', () => {
+        if (feedMode === 'merged') return;
+        setFeedMode('merged', null);
+      });
+      row.appendChild(mergedBtn);
+
       for (const ch of ytFavorites) {
         const btn = document.createElement('button');
-        btn.className = 'chip' + (activeChannelId === ch.channelId ? ' is-active' : '');
+        btn.className = 'chip' + (feedMode === 'channel' && activeChannelId === ch.channelId ? ' is-active' : '');
         if (ch.thumbnailUrl) {
           const img = document.createElement('img');
           img.className = 'chip-avatar';
@@ -808,12 +845,25 @@
         }
         btn.appendChild(document.createTextNode(ch.name));
         btn.addEventListener('click', () => {
-          if (activeChannelId === ch.channelId) return;
-          activeChannelId = ch.channelId;
-          renderChips();
-          resetAndSearch();
+          if (feedMode === 'channel' && activeChannelId === ch.channelId) return;
+          setFeedMode('channel', ch.channelId);
         });
         row.appendChild(btn);
+      }
+    }
+
+    // チャンネル選択の切り替え。'channel'/'merged' は自動取得せず、
+    // 手動の「読み込み」ボタンを押すまでキャッシュ済みデータ（あれば）を表示する
+    function setFeedMode(mode, channelId) {
+      feedMode        = mode;
+      activeChannelId = channelId;
+      viewPage        = 0;
+      renderChips();
+      updateLoadRowVisibility();
+      if (mode === 'all') {
+        resetAndSearch();
+      } else {
+        renderCacheView();
       }
     }
 
@@ -825,7 +875,9 @@
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('is-active'));
         btn.classList.add('is-active');
         activeFilter = btn.dataset.filter;
-        resetAndSearch();
+        if (feedMode === 'all') { resetAndSearch(); return; }
+        viewPage = 0;
+        renderCacheView();
       });
     });
 
@@ -1001,7 +1053,10 @@
       const hasNext = nextPageToken !== null;
       pag.hidden = !hasPrev && !hasNext;
       document.getElementById('btn-prev').disabled = !hasPrev;
-      document.getElementById('btn-next').disabled = !hasNext;
+      const nextBtn = document.getElementById('btn-next');
+      nextBtn.disabled     = !hasNext;
+      nextBtn.textContent  = '次へ →';
+      nextBtn.dataset.mode = 'next';
       document.getElementById('page-num').textContent = `${currentPage} ページ`;
     }
 
@@ -1010,82 +1065,16 @@
       doSearch(null);
     }
 
-    // ===== YouTube API search =====
-
-    // チャンネル選択 + アーカイブ/動画フィルター:
-    // search.list は検索インデックス依存で取得漏れが多いため
-    // playlistItems.list（アップロード一覧）+ videos.list で完全取得する
-    async function doSearchByPlaylist(pageToken) {
-      const uploadsId = 'UU' + activeChannelId.slice(2);
-
-      const plUrl = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
-      plUrl.searchParams.set('part',       'contentDetails');
-      plUrl.searchParams.set('playlistId', uploadsId);
-      plUrl.searchParams.set('maxResults', String(MAX_RESULTS));
-      plUrl.searchParams.set('key',        apiKey);
-      if (pageToken) plUrl.searchParams.set('pageToken', pageToken);
-
-      const plRes = await fetch(plUrl);
-      if (plRes.status === 403) throw new Error('API キーが無効または quota 超過です');
-      if (!plRes.ok)            throw new Error(`HTTP ${plRes.status}`);
-      const plData = await plRes.json();
-
-      const videoIds = (plData.items ?? []).map(i => i.contentDetails.videoId);
-      if (!videoIds.length) {
-        nextPageToken = plData.nextPageToken || null;
-        currentToken  = pageToken;
-        renderResults([]);
-        updatePaginationUI();
-        return;
-      }
-
-      // videos.list でライブ配信情報を取得してフィルタリング
-      const vUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
-      vUrl.searchParams.set('part', 'snippet,liveStreamingDetails');
-      vUrl.searchParams.set('id',   videoIds.join(','));
-      vUrl.searchParams.set('key',  apiKey);
-
-      const vRes = await fetch(vUrl);
-      if (!vRes.ok) throw new Error(`HTTP ${vRes.status}`);
-      const vData = await vRes.json();
-
-      let filtered = vData.items ?? [];
-      if (activeFilter === 'archive') {
-        filtered = filtered.filter(v => v.liveStreamingDetails?.actualEndTime);
-      } else {
-        // 'video': 通常アップロード（ライブ配信ではないもの）
-        filtered = filtered.filter(v => !v.liveStreamingDetails);
-      }
-
-      // search.list と同じ形式に正規化して renderResults を共通利用
-      const items = filtered.map(v => ({
-        id: { videoId: v.id },
-        snippet: {
-          title:               v.snippet.title,
-          thumbnails:          v.snippet.thumbnails,
-          publishedAt:         v.snippet.publishedAt,
-          channelTitle:        v.snippet.channelTitle,
-          liveBroadcastContent: 'none',
-        }
-      }));
-
-      nextPageToken = plData.nextPageToken || null;
-      currentToken  = pageToken;
-
-      renderResults(items);
-      updatePaginationUI();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    // ===== YouTube API search（'all' モード: キーワードのみ・都度 search.list） =====
 
     async function doSearch(pageToken) {
       if (!apiKey) { showApiWarning(); return; }
 
       const q = document.getElementById('q').value.trim();
 
-      // 動画・ショートはチャンネルかキーワードが必要
-      if ((activeFilter === 'video' || activeFilter === 'short') && !q && !activeChannelId) {
+      if ((activeFilter === 'video' || activeFilter === 'short') && !q) {
         document.getElementById('results').innerHTML =
-          '<p class="hint-text">キーワードを入力するか、チャンネルチップを選んでください</p>';
+          '<p class="hint-text">キーワードを入力してください</p>';
         document.getElementById('pagination').hidden = true;
         return;
       }
@@ -1097,12 +1086,6 @@
       document.getElementById('pagination').hidden = true;
 
       try {
-        // チャンネル選択済み + アーカイブ/動画 → playlistItems で完全取得
-        if (activeChannelId && (activeFilter === 'archive' || activeFilter === 'video')) {
-          await doSearchByPlaylist(pageToken);
-          return;
-        }
-
         const url = new URL('https://www.googleapis.com/youtube/v3/search');
         url.searchParams.set('part',       'snippet');
         url.searchParams.set('type',       'video');
@@ -1112,12 +1095,7 @@
         // ページトークン（2ページ目以降）
         if (pageToken) url.searchParams.set('pageToken', pageToken);
 
-        // チャンネルチップ選択: そのチャンネルを date 順（新しい順）で取得
-        if (activeChannelId) {
-          url.searchParams.set('channelId', activeChannelId);
-          url.searchParams.set('order',     'date');
-          if (q) url.searchParams.set('q', q);
-        } else if (q) {
+        if (q) {
           url.searchParams.set('q',     q);
           url.searchParams.set('order', 'relevance');
         } else {
@@ -1160,6 +1138,246 @@
         btn.disabled    = false;
         btn.textContent = '検索';
       }
+    }
+
+    // ===== チャンネル/まとめて読み込みキャッシュ（'channel' / 'merged' モード） =====
+
+    function clearCache(key) { delete caches[key]; }
+
+    function ensureCache(key) {
+      if (!caches[key]) caches[key] = { items: [], loadedAt: null, exhausted: false, cursor: null };
+      return caches[key];
+    }
+
+    function ensureMergedCache() {
+      if (!caches[MERGED_KEY]) {
+        caches[MERGED_KEY] = {
+          items: [], loadedAt: null, exhausted: false,
+          perChannel: ytFavorites.map(ch => ({ channelId: ch.channelId, buffer: [], cursor: null, exhausted: false })),
+        };
+      }
+      return caches[MERGED_KEY];
+    }
+
+    function currentCacheKey() {
+      if (feedMode === 'merged')  return MERGED_KEY;
+      if (feedMode === 'channel') return activeChannelId;
+      return null;
+    }
+
+    // "PT1H2M3S" → 3723
+    function isoDurationToSeconds(iso) {
+      const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || '');
+      if (!m) return 0;
+      return (Number(m[1] || 0) * 3600) + (Number(m[2] || 0) * 60) + Number(m[3] || 0);
+    }
+
+    // videos.list の生データを renderResults 互換の形へ正規化 + タイプ分類を付与
+    function normalizeVideoItem(v) {
+      const live        = v.liveStreamingDetails;
+      const durationSec = isoDurationToSeconds(v.contentDetails?.duration);
+      const isArchive   = !!(live && live.actualEndTime);
+      const isLive      = !!(live && !live.actualEndTime);
+      const isShort     = !live && durationSec > 0 && durationSec <= 60;
+      const isVideo     = !live && !isShort;
+      return {
+        id: { videoId: v.id },
+        snippet: {
+          title:                v.snippet.title,
+          thumbnails:           v.snippet.thumbnails,
+          publishedAt:          v.snippet.publishedAt,
+          channelTitle:         v.snippet.channelTitle,
+          liveBroadcastContent: isLive ? 'live' : 'none',
+        },
+        _isArchive: isArchive, _isLive: isLive, _isShort: isShort, _isVideo: isVideo,
+      };
+    }
+
+    function matchesFilter(item) {
+      switch (activeFilter) {
+        case 'archive': return item._isArchive;
+        case 'live':    return item._isLive;
+        case 'short':   return item._isShort;
+        case 'video':   return item._isVideo;
+        default:        return true;
+      }
+    }
+
+    function computeFilteredItems(cache) {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      return cache.items.filter(it => matchesFilter(it) && (!q || it.snippet.title.toLowerCase().includes(q)));
+    }
+
+    // 1チャンネル分のアップロード一覧を1ページ取得（playlistItems + videos.list）
+    async function fetchChannelPageRaw(channelId, pageToken) {
+      const uploadsId = 'UU' + channelId.slice(2);
+
+      const plUrl = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+      plUrl.searchParams.set('part',       'contentDetails');
+      plUrl.searchParams.set('playlistId', uploadsId);
+      plUrl.searchParams.set('maxResults', String(PLAYLIST_PAGE_SIZE));
+      plUrl.searchParams.set('key',        apiKey);
+      if (pageToken) plUrl.searchParams.set('pageToken', pageToken);
+
+      const plRes = await fetch(plUrl);
+      if (plRes.status === 403) throw new Error('API キーが無効または quota 超過です');
+      if (!plRes.ok)            throw new Error(`HTTP ${plRes.status}`);
+      const plData = await plRes.json();
+
+      const videoIds  = (plData.items ?? []).map(i => i.contentDetails.videoId);
+      const nextToken = plData.nextPageToken || null;
+      if (!videoIds.length) return { items: [], nextToken };
+
+      const vUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+      vUrl.searchParams.set('part', 'snippet,contentDetails,liveStreamingDetails');
+      vUrl.searchParams.set('id',   videoIds.join(','));
+      vUrl.searchParams.set('key',  apiKey);
+
+      const vRes = await fetch(vUrl);
+      if (!vRes.ok) throw new Error(`HTTP ${vRes.status}`);
+      const vData = await vRes.json();
+
+      return { items: (vData.items ?? []).map(normalizeVideoItem), nextToken };
+    }
+
+    // 単一チャンネル: targetCount 件（現在のフィルター＋キーワード適用後）に達するか、
+    // 上限ページ数に達するか、チャンネルの最古まで到達するまで追加取得する
+    async function extendChannelCache(channelId, cache, targetCount) {
+      let fetches = 0;
+      while (!cache.exhausted && fetches < MAX_AUTO_FETCH_PAGES) {
+        const { items, nextToken } = await fetchChannelPageRaw(channelId, cache.cursor);
+        cache.items.push(...items);
+        cache.cursor = nextToken;
+        if (!nextToken) cache.exhausted = true;
+        fetches++;
+        if (computeFilteredItems(cache).length >= targetCount) break;
+      }
+      cache.loadedAt = Date.now();
+    }
+
+    // 読み込みボタン: キャッシュを空にしてゼロから取得し直す（新着確認用）
+    async function loadChannelCache(channelId) {
+      const cache = ensureCache(channelId);
+      cache.items     = [];
+      cache.cursor    = null;
+      cache.exhausted = false;
+      viewPage = 0;
+      await extendChannelCache(channelId, cache, MAX_RESULTS);
+    }
+
+    // まとめてフィード: 1チャンネル分バッファを補充
+    async function refillChannelBuffer(pc) {
+      if (pc.exhausted) return;
+      const { items, nextToken } = await fetchChannelPageRaw(pc.channelId, pc.cursor);
+      pc.buffer.push(...items); // API から新しい順で返るのでそのまま追加でよい
+      pc.cursor = nextToken;
+      if (!nextToken) pc.exhausted = true;
+    }
+
+    // 登録チャンネル群を「先頭同士を比較して一番新しいものから出す」k-way merge で合成
+    async function extendMergedCache(cache, targetCount) {
+      let fetches = 0;
+
+      // 各チャンネルのバッファをシード（比較のため、枯渇していない限り最低1件は必要）
+      for (const pc of cache.perChannel) {
+        if (!pc.buffer.length && !pc.exhausted && fetches < MAX_AUTO_FETCH_PAGES) {
+          await refillChannelBuffer(pc);
+          fetches++;
+        }
+      }
+
+      while (fetches < MAX_AUTO_FETCH_PAGES) {
+        let candidate = null;
+        for (const pc of cache.perChannel) {
+          if (!pc.buffer.length) continue;
+          if (!candidate || new Date(pc.buffer[0].snippet.publishedAt) > new Date(candidate.buffer[0].snippet.publishedAt)) {
+            candidate = pc;
+          }
+        }
+        if (!candidate) break; // 取得済みチャンネルが全て枯渇
+
+        cache.items.push(candidate.buffer.shift());
+        if (!candidate.buffer.length && !candidate.exhausted) {
+          await refillChannelBuffer(candidate);
+          fetches++;
+        }
+        if (computeFilteredItems(cache).length >= targetCount) break;
+      }
+
+      cache.exhausted = cache.perChannel.every(pc => pc.exhausted && !pc.buffer.length);
+      cache.loadedAt  = Date.now();
+    }
+
+    async function loadMergedCache() {
+      clearCache(MERGED_KEY);
+      const cache = ensureMergedCache();
+      viewPage = 0;
+      await extendMergedCache(cache, MAX_RESULTS);
+    }
+
+    // ===== キャッシュ表示（'channel' / 'merged' モードの描画） =====
+
+    function updateLoadRowVisibility() {
+      document.getElementById('load-row').hidden = (feedMode === 'all');
+    }
+
+    function updateLoadStatus(loadedAt) {
+      document.getElementById('load-status').textContent = loadedAt
+        ? `最終読み込み: ${new Date(loadedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`
+        : '';
+    }
+
+    function updateCachePaginationUI(cache, filtered) {
+      const pag       = document.getElementById('pagination');
+      const hasPrev   = viewPage > 0;
+      const hasMore   = filtered.length > (viewPage + 1) * MAX_RESULTS;
+      const canExtend = !cache.exhausted;
+
+      pag.hidden = !hasPrev && !hasMore && !canExtend;
+      document.getElementById('btn-prev').disabled = !hasPrev;
+
+      const nextBtn = document.getElementById('btn-next');
+      if (hasMore) {
+        nextBtn.textContent  = '次へ →';
+        nextBtn.disabled     = false;
+        nextBtn.dataset.mode = 'next';
+      } else if (canExtend) {
+        nextBtn.textContent  = 'さらに読み込む';
+        nextBtn.disabled     = false;
+        nextBtn.dataset.mode = 'extend';
+      } else {
+        nextBtn.textContent  = '次へ →';
+        nextBtn.disabled     = true;
+        nextBtn.dataset.mode = 'next';
+      }
+      document.getElementById('page-num').textContent = `${viewPage + 1} ページ`;
+    }
+
+    function renderCacheView() {
+      document.getElementById('pagination').hidden = true;
+      const key = currentCacheKey();
+      if (!key) { document.getElementById('results').innerHTML = ''; return; }
+
+      const cache = caches[key];
+      if (!cache || cache.loadedAt === null) {
+        document.getElementById('results').innerHTML =
+          '<p class="hint-text">「📥 読み込み」を押すと動画一覧を取得します</p>';
+        updateLoadStatus(null);
+        return;
+      }
+
+      const filtered = computeFilteredItems(cache);
+      const start     = viewPage * MAX_RESULTS;
+      const pageItems = filtered.slice(start, start + MAX_RESULTS);
+
+      if (!pageItems.length) {
+        document.getElementById('results').innerHTML = '<p class="hint-text">条件に一致する動画が見つかりませんでした</p>';
+      } else {
+        renderResults(pageItems);
+      }
+
+      updateCachePaginationUI(cache, filtered);
+      updateLoadStatus(cache.loadedAt);
     }
 
     // ===== YouTube result rendering =====
@@ -1237,18 +1455,46 @@
 
     // ===== Pagination buttons =====
 
-    document.getElementById('btn-next').addEventListener('click', () => {
-      if (!nextPageToken) return;
-      pageHistory.push(currentToken); // 現在のページのトークンを履歴に積む
-      currentPage++;
-      doSearch(nextPageToken);
+    document.getElementById('btn-next').addEventListener('click', async () => {
+      if (feedMode === 'all') {
+        if (!nextPageToken) return;
+        pageHistory.push(currentToken); // 現在のページのトークンを履歴に積む
+        currentPage++;
+        doSearch(nextPageToken);
+        return;
+      }
+
+      const nextBtn = document.getElementById('btn-next');
+      const key     = currentCacheKey();
+      const cache   = caches[key];
+      if (!cache) return;
+
+      if (nextBtn.dataset.mode === 'extend') {
+        nextBtn.disabled    = true;
+        nextBtn.textContent = '読み込み中…';
+        try {
+          const targetCount = (viewPage + 2) * MAX_RESULTS;
+          if (feedMode === 'merged') await extendMergedCache(cache, targetCount);
+          else                       await extendChannelCache(activeChannelId, cache, targetCount);
+        } catch (err) {
+          showToast(`読み込みエラー: ${err.message}`, 'warn');
+        }
+      }
+      viewPage++;
+      renderCacheView();
     });
 
     document.getElementById('btn-prev').addEventListener('click', () => {
-      if (!pageHistory.length) return;
-      const prevToken = pageHistory.pop();
-      currentPage--;
-      doSearch(prevToken);
+      if (feedMode === 'all') {
+        if (!pageHistory.length) return;
+        const prevToken = pageHistory.pop();
+        currentPage--;
+        doSearch(prevToken);
+        return;
+      }
+      if (viewPage === 0) return;
+      viewPage--;
+      renderCacheView();
     });
 
     // ===== YouTube event wiring =====
@@ -1265,9 +1511,38 @@
       applyTwChToggle();
     });
 
-    document.getElementById('btn-search').addEventListener('click', resetAndSearch);
+    document.getElementById('btn-search').addEventListener('click', () => {
+      if (feedMode === 'all') { resetAndSearch(); return; }
+      viewPage = 0;
+      renderCacheView();
+    });
     document.getElementById('q').addEventListener('keydown', e => {
-      if (e.key === 'Enter') resetAndSearch();
+      if (e.key !== 'Enter') return;
+      if (feedMode === 'all') { resetAndSearch(); return; }
+      viewPage = 0;
+      renderCacheView();
+    });
+
+    // 読み込みボタン: 選択中のリスト（チャンネル / まとめて）を取得し直す
+    document.getElementById('btn-load').addEventListener('click', async () => {
+      if (!apiKey) { showApiWarning(); return; }
+
+      const btn = document.getElementById('btn-load');
+      btn.disabled = true;
+      btn.textContent = '読み込み中…';
+      document.getElementById('results').innerHTML = '<p class="loading-text">読み込み中…</p>';
+
+      try {
+        if (feedMode === 'merged' ) await loadMergedCache();
+        if (feedMode === 'channel' && activeChannelId) await loadChannelCache(activeChannelId);
+        renderCacheView();
+      } catch (err) {
+        document.getElementById('results').innerHTML =
+          `<div class="error-text">読み込みエラー: ${escHtml(err.message)}</div>`;
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = '📥 読み込み';
+      }
     });
 
     // YouTube 動画パネルボタン（イベント委譲）
@@ -1289,6 +1564,7 @@
     renderChips();
     applyChipToggle();
     applyTwChToggle();
+    updateLoadRowVisibility();
 
     const statusEl = document.getElementById('api-status');
     if (apiKey) {
