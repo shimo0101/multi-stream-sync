@@ -86,6 +86,7 @@
 
     window.addEventListener('message', (e) => {
       if (!player) return;
+      if (e.source !== window.parent) return; // 埋め込み元（ダッシュボード）以外からの操作を無視
       const { type, data } = e.data || {};
       switch (type) {
         case 'ytSeek':      player.seekTo(Math.max(0, data?.time ?? 0), true); break;
