@@ -105,7 +105,7 @@ function createPanelHTML(idx) {
         <button id="btn-mute-${idx}" class="btn--mute" title="ミュート">🔊</button>
         <div class="volume-bar" id="vol-bar-${idx}" hidden>
           <input type="range" class="volume-range" id="vol-range-${idx}"
-                 min="0" max="100" step="10" value="100">
+                 min="0" max="100" step="1" value="100">
           <span class="volume-label" id="vol-label-${idx}">100%</span>
         </div>
       </div>
