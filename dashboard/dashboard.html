@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="../icons/icon-96.png">
   <link rel="manifest" href="pwa.webmanifest">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=31">
+  <link rel="stylesheet" href="dashboard.css?v=32">
 </head>
 <body>
 
@@ -109,6 +109,10 @@
       <div class="cb-action-row">
         <button id="cb-yt-refresh" class="btn btn--secondary">ライブ確認</button>
         <button id="cb-yt-picker"  class="btn btn--secondary">動画を探す ↗</button>
+        <button id="cb-yt-more"    class="btn btn--secondary cb-more-btn" title="その他の操作">▼</button>
+      </div>
+      <div class="cb-secondary-row" id="cb-yt-secondary" hidden>
+        <button id="cb-yt-refresh-icon" class="btn btn--secondary">🔄 アイコン更新</button>
       </div>
       <div class="cb-group-bar" id="cb-yt-group-bar"></div>
       <div class="cb-group-manage" id="cb-yt-group-manage" hidden></div>
@@ -142,6 +146,6 @@
   <!-- チャンネルブラウザ バックドロップ（モバイルのみ表示） -->
   <div class="cb-backdrop" id="cb-backdrop"></div>
 
-  <script type="module" src="dashboard.js?v=31"></script>
+  <script type="module" src="dashboard.js?v=32"></script>
 </body>
 </html>

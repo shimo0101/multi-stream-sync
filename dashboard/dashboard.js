@@ -1443,6 +1443,57 @@ document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
   cbSetStatus(`ライブ確認完了 — ${liveCount} チャンネルが配信中`, liveCount > 0 ? 'ok' : 'info');
 });
 
+// YouTube: アイコン一括更新（channels.list は id を最大50件までまとめて指定できるためチャンク処理）
+async function cbFetchYouTubeThumbnails(channelIds) {
+  const apiKey = settings.ytApiKey;
+  const result = {};
+  for (let i = 0; i < channelIds.length; i += 50) {
+    const chunk = channelIds.slice(i, i + 50);
+    const url = new URL('https://www.googleapis.com/youtube/v3/channels');
+    url.searchParams.set('part', 'snippet');
+    url.searchParams.set('id', chunk.join(','));
+    url.searchParams.set('key', apiKey);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const item of data.items ?? []) {
+        result[item.id] = item.snippet.thumbnails?.default?.url ?? null;
+      }
+    } catch {}
+  }
+  return result;
+}
+
+document.getElementById('cb-yt-refresh-icon').addEventListener('click', async () => {
+  if (!cbFavorites.youtube.length) { cbSetStatus('チャンネルを追加してください', 'error'); return; }
+  if (!settings.ytApiKey) { cbSetStatus('YouTube API Key が未設定です（⚙ 共通設定）', 'error'); return; }
+
+  const btn = document.getElementById('cb-yt-refresh-icon');
+  btn.disabled    = true;
+  btn.textContent = '更新中…';
+
+  const thumbs = await cbFetchYouTubeThumbnails(cbFavorites.youtube.map(ch => ch.channelId));
+  cbFavorites.youtube.forEach((ch, i) => {
+    if (thumbs[ch.channelId] !== undefined) cbFavorites.youtube[i].thumbnailUrl = thumbs[ch.channelId];
+  });
+
+  cbSave();
+  cbRenderYtList();
+  btn.disabled    = false;
+  btn.textContent = '🔄 アイコン更新';
+  cbSetStatus('YouTube アイコンを更新しました', 'ok');
+});
+
+// YouTube: その他操作トグル（アイコン更新などを折りたたむ）
+document.getElementById('cb-yt-more').addEventListener('click', () => {
+  const sec = document.getElementById('cb-yt-secondary');
+  const btn = document.getElementById('cb-yt-more');
+  const opening = sec.hidden;
+  sec.hidden = !opening;
+  btn.textContent = opening ? '▲' : '▼';
+});
+
 // Twitch: 登録時にプロフィール画像を取得（token・clientId がなければ null）
 async function cbFetchTwitchThumbnail(username) {
   const token    = localStorage.getItem('mss-tw-token');
