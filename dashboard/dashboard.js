@@ -1156,33 +1156,57 @@ async function cbRunLimited(items, limit, fn) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
-async function cbFetchYouTubeLive(channelId, retriesLeft = 2) {
-  const apiKey = settings.ytApiKey;
-  if (!apiKey) return null;
+async function cbFetchJsonWithRetry(url, retriesLeft = 2) {
+  const res = await fetch(url);
+  if (res.status === 429 && retriesLeft > 0) {
+    // レート制限。少し待って再試行する
+    await cbSleep(800);
+    return cbFetchJsonWithRetry(url, retriesLeft - 1);
+  }
+  if (!res.ok) return null;
+  return res.json();
+}
 
-  const url = new URL('https://www.googleapis.com/youtube/v3/search');
-  url.searchParams.set('channelId', channelId);
-  url.searchParams.set('type', 'video');
-  url.searchParams.set('eventType', 'live');
-  url.searchParams.set('part', 'snippet');
-  url.searchParams.set('maxResults', '1');
+// チャンネルの直近アップロード（ライブ中の配信も含む）のvideoIdを数件取得する。
+// search.list（1回100ユニット・レート制限が厳しい）ではなく、
+// playlistItems.list（1回1ユニット・レート制限が緩い）を使うことで
+// 登録チャンネルが多くても429エラーやクォータ枯渇が起きにくくする
+async function cbFetchRecentUploadIds(channelId, count = 3) {
+  const apiKey = settings.ytApiKey;
+  const uploadsId = 'UU' + channelId.slice(2);
+  const url = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+  url.searchParams.set('part', 'contentDetails');
+  url.searchParams.set('playlistId', uploadsId);
+  url.searchParams.set('maxResults', String(count));
   url.searchParams.set('key', apiKey);
 
   try {
-    const res = await fetch(url);
-    if (res.status === 429 && retriesLeft > 0) {
-      // レート制限。少し待って再試行する
-      await cbSleep(800);
-      return cbFetchYouTubeLive(channelId, retriesLeft - 1);
-    }
-    if (!res.ok) return null;
-    const data = await res.json();
-    const item = data.items?.[0];
-    if (!item) return null;
-    return { videoId: item.id.videoId, title: item.snippet.title };
+    const data = await cbFetchJsonWithRetry(url);
+    return (data?.items ?? []).map(i => i.contentDetails.videoId);
   } catch {
-    return null;
+    return [];
   }
+}
+
+// 複数動画IDのライブ状態をまとめて確認する（videos.list は id を最大50件まとめて指定でき、1回1ユニット）
+async function cbFetchLiveStatusBatch(videoIds) {
+  const apiKey = settings.ytApiKey;
+  const result = {}; // videoId -> { isLive, title }
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const chunk = videoIds.slice(i, i + 50);
+    const url = new URL('https://www.googleapis.com/youtube/v3/videos');
+    url.searchParams.set('part', 'snippet,liveStreamingDetails');
+    url.searchParams.set('id', chunk.join(','));
+    url.searchParams.set('key', apiKey);
+    try {
+      const data = await cbFetchJsonWithRetry(url);
+      for (const item of data?.items ?? []) {
+        const live = item.liveStreamingDetails;
+        result[item.id] = { isLive: !!(live && !live.actualEndTime), title: item.snippet.title };
+      }
+    } catch {}
+  }
+  return result;
 }
 
 // パネル選択ボタンを生成（現在存在するパネル数に応じて）
@@ -1499,11 +1523,20 @@ document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = '確認中…';
 
-  // 同時実行数を3に制限（登録チャンネルが多くてもYouTube側のレート制限(429)を避ける）
-  await cbRunLimited(cbFavorites.youtube, 3, async (ch, i) => {
-    const live = await cbFetchYouTubeLive(ch.channelId);
-    cbFavorites.youtube[i].liveVideoId = live?.videoId ?? null;
-    cbFavorites.youtube[i].liveTitle   = live?.title   ?? null;
+  // 1) 各チャンネルの直近アップロードIDを取得（同時実行数5・playlistItems.listは軽量でレート制限が緩い）
+  const recentIds = {}; // channelId -> [videoId, ...]
+  await cbRunLimited(cbFavorites.youtube, 5, async (ch) => {
+    recentIds[ch.channelId] = await cbFetchRecentUploadIds(ch.channelId);
+  });
+
+  // 2) 集めた動画IDをまとめてライブ判定（videos.list、50件ずつバッチ）
+  const allIds     = [...new Set(Object.values(recentIds).flat())];
+  const liveStatus = await cbFetchLiveStatusBatch(allIds);
+
+  cbFavorites.youtube.forEach((ch, i) => {
+    const liveId = (recentIds[ch.channelId] ?? []).find(id => liveStatus[id]?.isLive);
+    cbFavorites.youtube[i].liveVideoId = liveId ?? null;
+    cbFavorites.youtube[i].liveTitle   = liveId ? liveStatus[liveId].title : null;
   });
 
   cbYtLiveSorted = true;
