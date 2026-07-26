@@ -133,6 +133,18 @@
 
     .chip-avatar { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; }
 
+    /* ===== グループタブ（チャンネルのグループ絞り込み） ===== */
+    .group-tab-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+    .group-tab-row:empty { display: none; }
+    .group-tab {
+      padding: 3px 11px;
+      background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 14px;
+      font-size: 11px; font-weight: 600; color: #9ca3af;
+      cursor: pointer; transition: all 0.12s; white-space: nowrap;
+    }
+    .group-tab:hover { background: #2a2a3a; color: #e0e0e0; }
+    .group-tab.is-active { background: #1e1a3a; border-color: #7c3aed; color: #c4b5fd; }
+
     /* ===== Load button (channel / merged feed cache) ===== */
     .load-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
     .load-status { font-size: 11px; color: #6b7280; }
@@ -456,6 +468,7 @@
         <input type="text" id="q" class="search-input" placeholder="キーワードを入力…" autocomplete="off">
         <button class="btn-yt-search" id="btn-search">検索</button>
       </div>
+      <div class="group-tab-row" id="yt-group-tabs"></div>
       <div class="chip-section-header">
         <span class="chip-section-label">チャンネル絞り込み</span>
         <button id="btn-chip-toggle" class="btn-chip-toggle">▼</button>
@@ -525,6 +538,7 @@
 
       <!-- チャンネル一覧ビュー -->
       <div id="tw-channels-view">
+        <div class="group-tab-row" id="tw-group-tabs"></div>
         <div class="tw-favorites-header">
           <div class="tw-favorites-label">お気に入りチャンネル</div>
           <button id="btn-tw-ch-toggle" class="btn-chip-toggle">▼</button>
@@ -562,11 +576,19 @@
     // チャンネル/まとめて読み込みキャッシュ関連
     const PLAYLIST_PAGE_SIZE   = 50; // playlistItems.list の1回あたり取得件数
     const MAX_AUTO_FETCH_PAGES = 10; // 1クリックで自動的に辿るページ数の上限（クォータ保護）
-    const MERGED_KEY           = '__merged__';
+    const MERGED_KEY_PREFIX    = '__merged__';
 
     let apiKey      = '';
     let ytFavorites = [];
     let twFavorites = [];
+
+    // チャンネルのグループ分け（タブ）— グループの作成・編集はダッシュボード側で行う。ここでは絞り込みのみ
+    let ytGroups      = []; // [{id, name}]
+    let twGroups      = [];
+    let activeYtGroup = null; // null=すべて, 'none'=未分類, それ以外=group.id
+    let activeTwGroup = null;
+
+    function mergedCacheKey() { return MERGED_KEY_PREFIX + ':' + (activeYtGroup ?? 'all'); }
 
     // Twitch OAuth / VOD
     let twClientId         = '';
@@ -627,6 +649,8 @@
         const f = JSON.parse(localStorage.getItem(FAV_KEY) || '{}');
         ytFavorites = f.youtube || [];
         twFavorites = f.twitch  || [];
+        ytGroups    = f.groupsYoutube || [];
+        twGroups    = f.groupsTwitch  || [];
       } catch {}
       twToken = localStorage.getItem(TW_TOKEN_KEY) || null;
     }
@@ -636,8 +660,10 @@
     window.addEventListener('storage', e => {
       if (e.key !== FAV_KEY) return;
       loadStorage();
-      clearCache(MERGED_KEY);
+      clearAllMergedCaches();
+      renderGroupTabs();
       renderChips();
+      renderTwitchFavorites();
       if (feedMode === 'merged') renderCacheView();
     });
 
@@ -850,7 +876,7 @@
       });
       row.appendChild(mergedBtn);
 
-      for (const ch of ytFavorites) {
+      for (const ch of filteredYtFavorites()) {
         const btn = document.createElement('button');
         btn.className = 'chip' + (feedMode === 'channel' && activeChannelId === ch.channelId ? ' is-active' : '');
         if (ch.thumbnailUrl) {
@@ -867,6 +893,43 @@
         });
         row.appendChild(btn);
       }
+    }
+
+    // ===== グループタブ（絞り込みのみ。作成・編集はダッシュボードで行う） =====
+
+    function renderGroupTabRow(containerId, groups, activeValue, onSelect) {
+      const row = document.getElementById(containerId);
+      if (!row) return;
+      row.innerHTML = '';
+      if (!groups.length) return; // グループ未作成なら絞り込みタブ自体を表示しない
+      const makeTab = (value, label) => {
+        const btn = document.createElement('button');
+        btn.className = 'group-tab' + (activeValue === value ? ' is-active' : '');
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+          if (activeValue === value) return;
+          onSelect(value);
+        });
+        return btn;
+      };
+      row.appendChild(makeTab(null, 'すべて'));
+      row.appendChild(makeTab('none', '未分類'));
+      for (const g of groups) row.appendChild(makeTab(g.id, g.name));
+    }
+
+    function renderGroupTabs() {
+      renderGroupTabRow('yt-group-tabs', ytGroups, activeYtGroup, value => {
+        activeYtGroup = value;
+        viewPage = 0;
+        renderGroupTabs();
+        renderChips();
+        if (feedMode === 'merged') renderCacheView();
+      });
+      renderGroupTabRow('tw-group-tabs', twGroups, activeTwGroup, value => {
+        activeTwGroup = value;
+        renderGroupTabs();
+        renderTwitchFavorites();
+      });
     }
 
     // チャンネル選択の切り替え。'channel'/'merged' は自動取得せず、
@@ -902,9 +965,10 @@
 
     function renderTwitchFavorites() {
       const q = document.getElementById('tw-filter').value.toLowerCase().trim();
+      const base = filteredTwFavorites();
       const channels = q
-        ? twFavorites.filter(ch => ch.username.toLowerCase().includes(q))
-        : twFavorites;
+        ? base.filter(ch => ch.username.toLowerCase().includes(q))
+        : base;
 
       const container = document.getElementById('tw-results');
       if (!channels.length) {
@@ -1162,23 +1226,43 @@
 
     function clearCache(key) { delete caches[key]; }
 
+    function clearAllMergedCaches() {
+      for (const key of Object.keys(caches)) {
+        if (key.startsWith(MERGED_KEY_PREFIX)) delete caches[key];
+      }
+    }
+
     function ensureCache(key) {
       if (!caches[key]) caches[key] = { items: [], loadedAt: null, exhausted: false, cursor: null };
       return caches[key];
     }
 
+    // グループタブで絞り込んだ後のお気に入りチャンネル一覧
+    function filteredYtFavorites() {
+      if (activeYtGroup === 'none') return ytFavorites.filter(ch => !ch.groupId);
+      if (activeYtGroup)            return ytFavorites.filter(ch => ch.groupId === activeYtGroup);
+      return ytFavorites;
+    }
+
+    function filteredTwFavorites() {
+      if (activeTwGroup === 'none') return twFavorites.filter(ch => !ch.groupId);
+      if (activeTwGroup)            return twFavorites.filter(ch => ch.groupId === activeTwGroup);
+      return twFavorites;
+    }
+
     function ensureMergedCache() {
-      if (!caches[MERGED_KEY]) {
-        caches[MERGED_KEY] = {
+      const key = mergedCacheKey();
+      if (!caches[key]) {
+        caches[key] = {
           items: [], loadedAt: null, exhausted: false,
-          perChannel: ytFavorites.map(ch => ({ channelId: ch.channelId, buffer: [], cursor: null, exhausted: false })),
+          perChannel: filteredYtFavorites().map(ch => ({ channelId: ch.channelId, buffer: [], cursor: null, exhausted: false })),
         };
       }
-      return caches[MERGED_KEY];
+      return caches[key];
     }
 
     function currentCacheKey() {
-      if (feedMode === 'merged')  return MERGED_KEY;
+      if (feedMode === 'merged')  return mergedCacheKey();
       if (feedMode === 'channel') return activeChannelId;
       return null;
     }
@@ -1327,7 +1411,7 @@
     }
 
     async function loadMergedCache() {
-      clearCache(MERGED_KEY);
+      clearCache(mergedCacheKey());
       const cache = ensureMergedCache();
       viewPage = 0;
       await extendMergedCache(cache, MAX_RESULTS);
@@ -1472,7 +1556,10 @@
 
     function saveFavorites() {
       try {
-        localStorage.setItem(FAV_KEY, JSON.stringify({ youtube: ytFavorites, twitch: twFavorites }));
+        localStorage.setItem(FAV_KEY, JSON.stringify({
+          youtube: ytFavorites, twitch: twFavorites,
+          groupsYoutube: ytGroups, groupsTwitch: twGroups,
+        }));
       } catch {}
     }
 
@@ -1495,7 +1582,8 @@
 
       try {
         const thumbnailUrl = await fetchChannelThumbnail(channelId);
-        ytFavorites.push({ channelId, name: channelTitle, thumbnailUrl });
+        const groupId = (activeYtGroup && activeYtGroup !== 'none') ? activeYtGroup : null;
+        ytFavorites.push({ channelId, name: channelTitle, thumbnailUrl, groupId });
         saveFavorites();
         renderChips();
         if (feedMode === 'all') renderResults(lastAllItems);
@@ -1633,6 +1721,7 @@
     // OAuth 直後は Twitch タブを優先、それ以外は URL パラメータ
     const initTab = _justAuthed ? 'twitch' : (new URLSearchParams(location.search).get('tab') || 'youtube');
     switchTab(initTab);
+    renderGroupTabs();
     renderChips();
     applyChipToggle();
     applyTwChToggle();

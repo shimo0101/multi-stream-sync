@@ -977,26 +977,63 @@ let cbFavorites    = { youtube: [], twitch: [] };
 let cbYtLiveSorted = false;
 let cbTwLiveSorted = false;
 
+// チャンネルのグループ分け（タブ）
+let cbGroups       = { youtube: [], twitch: [] };          // [{id, name}]
+let cbActiveGroup  = { youtube: null, twitch: null };      // null=すべて, 'none'=未分類, それ以外=group.id
+
+function cbGenGroupId() {
+  return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
 function cbLoad() {
   try {
     const stored = JSON.parse(localStorage.getItem(CB_STORAGE_KEY) || '{}');
     cbFavorites = {
-      youtube: (stored.youtube ?? []).map(ch => ({ ...ch, liveVideoId: null, liveTitle: null })),
-      twitch:  (stored.twitch  ?? []).map(ch => ({ ...ch, isLive: false, liveTitle: null })),
+      youtube: (stored.youtube ?? []).map(ch => ({ ...ch, groupId: ch.groupId ?? null, liveVideoId: null, liveTitle: null })),
+      twitch:  (stored.twitch  ?? []).map(ch => ({ ...ch, groupId: ch.groupId ?? null, isLive: false, liveTitle: null })),
+    };
+    cbGroups = {
+      youtube: stored.groupsYoutube ?? [],
+      twitch:  stored.groupsTwitch  ?? [],
     };
   } catch {
     cbFavorites = { youtube: [], twitch: [] };
+    cbGroups    = { youtube: [], twitch: [] };
   }
 }
 
 function cbSave() {
   try {
     const data = {
-      youtube: cbFavorites.youtube.map(({ channelId, name, thumbnailUrl }) => ({ channelId, name, thumbnailUrl })),
-      twitch:  cbFavorites.twitch.map(({ username, thumbnailUrl }) => ({ username, thumbnailUrl })),
+      youtube: cbFavorites.youtube.map(({ channelId, name, thumbnailUrl, groupId }) => ({ channelId, name, thumbnailUrl, groupId })),
+      twitch:  cbFavorites.twitch.map(({ username, thumbnailUrl, groupId }) => ({ username, thumbnailUrl, groupId })),
+      groupsYoutube: cbGroups.youtube,
+      groupsTwitch:  cbGroups.twitch,
     };
     localStorage.setItem(CB_STORAGE_KEY, JSON.stringify(data));
   } catch {}
+}
+
+// グループ絞り込み後のビュー（origIdx = cbFavorites[platform] 内の絶対インデックス）
+function cbGetFilteredView(platform) {
+  const list   = cbFavorites[platform];
+  const active = cbActiveGroup[platform];
+  const view   = list.map((ch, i) => ({ ...ch, origIdx: i }));
+  if (active === 'none') return view.filter(ch => !ch.groupId);
+  if (active)            return view.filter(ch => ch.groupId === active);
+  return view;
+}
+
+// グループ絞り込み中でも「見た目で隣」の要素とスワップする（配列上は非連続でもよい）
+function cbSwapWithFilteredNeighbor(platform, origIdx, direction) {
+  const view = cbGetFilteredView(platform);
+  const vi   = view.findIndex(ch => ch.origIdx === origIdx);
+  if (vi === -1) return;
+  const ni = vi + direction;
+  if (ni < 0 || ni >= view.length) return;
+  const otherOrigIdx = view[ni].origIdx;
+  const arr = cbFavorites[platform];
+  [arr[origIdx], arr[otherOrigIdx]] = [arr[otherOrigIdx], arr[origIdx]];
 }
 
 function escHtml(s) {
@@ -1073,12 +1110,17 @@ function cbPanelButtons(openAttr, enabled) {
 }
 
 function cbRenderYtList() {
+  cbRenderGroupBar('youtube');
   const list = document.getElementById('cb-yt-list');
   if (!cbFavorites.youtube.length) {
     list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
     return;
   }
-  const view = cbFavorites.youtube.map((ch, i) => ({ ...ch, origIdx: i }));
+  const view = cbGetFilteredView('youtube');
+  if (!view.length) {
+    list.innerHTML = '<li class="cb-empty">このグループにチャンネルがありません</li>';
+    return;
+  }
   if (cbYtLiveSorted) view.sort((a, b) => (b.liveVideoId ? 1 : 0) - (a.liveVideoId ? 1 : 0));
   const last    = view.length - 1;
   const sortBar = cbYtLiveSorted
@@ -1117,12 +1159,17 @@ function cbRenderYtList() {
 }
 
 function cbRenderTwList() {
+  cbRenderGroupBar('twitch');
   const list = document.getElementById('cb-tw-list');
   if (!cbFavorites.twitch.length) {
     list.innerHTML = '<li class="cb-empty">チャンネルを追加してください</li>';
     return;
   }
-  const view = cbFavorites.twitch.map((ch, i) => ({ ...ch, origIdx: i }));
+  const view = cbGetFilteredView('twitch');
+  if (!view.length) {
+    list.innerHTML = '<li class="cb-empty">このグループにチャンネルがありません</li>';
+    return;
+  }
   if (cbTwLiveSorted) view.sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0));
   const last    = view.length - 1;
   const sortBar = cbTwLiveSorted
@@ -1158,6 +1205,137 @@ function cbRenderTwList() {
     </li>
   `).join('');
 }
+
+// ===== チャンネルのグループ分け（タブ） =====
+
+function cbRenderGroupBar(platform) {
+  const bar = document.getElementById(platform === 'youtube' ? 'cb-yt-group-bar' : 'cb-tw-group-bar');
+  if (!bar) return;
+  const active = cbActiveGroup[platform];
+  const chip = (value, label) => `
+    <button class="cb-group-chip${active === value ? ' is-active' : ''}"
+            data-cb-group-filter data-platform="${platform}" data-group-value="${value === null ? '' : value}">
+      ${escHtml(label)}
+    </button>`;
+  bar.innerHTML =
+    chip(null, 'すべて') +
+    chip('none', '未分類') +
+    cbGroups[platform].map(g => chip(g.id, g.name)).join('') +
+    `<button class="cb-group-chip cb-group-manage-toggle" data-cb-group-manage-toggle="${platform}">⚙</button>`;
+}
+
+function cbRenderGroupManage(platform) {
+  const panel = document.getElementById(platform === 'youtube' ? 'cb-yt-group-manage' : 'cb-tw-group-manage');
+  if (!panel) return;
+  const groups = cbGroups[platform];
+  const rows = groups.map((g, i) => `
+    <div class="cb-group-manage-row">
+      <input class="input cb-name" data-cb-group-rename="${platform}:${i}" value="${escHtml(g.name)}">
+      <button class="cb-reorder-btn" data-cb-group-up="${platform}:${i}" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button class="cb-reorder-btn" data-cb-group-down="${platform}:${i}" ${i === groups.length - 1 ? 'disabled' : ''}>↓</button>
+      <button class="cb-del-btn" data-cb-group-del="${platform}:${i}">✕</button>
+    </div>`).join('');
+  panel.innerHTML = rows + `
+    <div class="cb-group-manage-row">
+      <input class="input cb-name" id="cb-group-new-${platform}" placeholder="新しいグループ名">
+      <button class="btn btn--secondary" data-cb-group-add="${platform}">＋ 追加</button>
+    </div>`;
+}
+
+function cbRenderListFor(platform) {
+  if (platform === 'youtube') cbRenderYtList(); else cbRenderTwList();
+}
+
+document.getElementById('channel-browser').addEventListener('click', (e) => {
+  const filterBtn = e.target.closest('[data-cb-group-filter]');
+  if (filterBtn) {
+    const platform = filterBtn.dataset.platform;
+    const value    = filterBtn.dataset.groupValue;
+    cbActiveGroup[platform] = value === '' ? null : value;
+    cbRenderListFor(platform);
+    return;
+  }
+
+  const manageToggle = e.target.closest('[data-cb-group-manage-toggle]');
+  if (manageToggle) {
+    const platform = manageToggle.dataset.cbGroupManageToggle;
+    const panel = document.getElementById(platform === 'youtube' ? 'cb-yt-group-manage' : 'cb-tw-group-manage');
+    const opening = panel.hidden;
+    panel.hidden = !opening;
+    if (opening) cbRenderGroupManage(platform);
+    return;
+  }
+
+  const addBtn = e.target.closest('[data-cb-group-add]');
+  if (addBtn) {
+    const platform = addBtn.dataset.cbGroupAdd;
+    const input = document.getElementById(`cb-group-new-${platform}`);
+    const name  = input.value.trim();
+    if (!name) return;
+    cbGroups[platform].push({ id: cbGenGroupId(), name });
+    cbSave();
+    cbRenderGroupManage(platform);
+    cbRenderGroupBar(platform);
+    return;
+  }
+
+  const upBtn = e.target.closest('[data-cb-group-up]');
+  if (upBtn) {
+    const [platform, idxStr] = upBtn.dataset.cbGroupUp.split(':');
+    const i = Number(idxStr);
+    if (i <= 0) return;
+    [cbGroups[platform][i - 1], cbGroups[platform][i]] = [cbGroups[platform][i], cbGroups[platform][i - 1]];
+    cbSave();
+    cbRenderGroupManage(platform);
+    cbRenderGroupBar(platform);
+    return;
+  }
+
+  const downBtn = e.target.closest('[data-cb-group-down]');
+  if (downBtn) {
+    const [platform, idxStr] = downBtn.dataset.cbGroupDown.split(':');
+    const i = Number(idxStr);
+    if (i >= cbGroups[platform].length - 1) return;
+    [cbGroups[platform][i], cbGroups[platform][i + 1]] = [cbGroups[platform][i + 1], cbGroups[platform][i]];
+    cbSave();
+    cbRenderGroupManage(platform);
+    cbRenderGroupBar(platform);
+    return;
+  }
+
+  const delBtn = e.target.closest('[data-cb-group-del]');
+  if (delBtn) {
+    const [platform, idxStr] = delBtn.dataset.cbGroupDel.split(':');
+    const i = Number(idxStr);
+    const removed = cbGroups[platform].splice(i, 1)[0];
+    if (removed) {
+      cbFavorites[platform].forEach(ch => { if (ch.groupId === removed.id) ch.groupId = null; });
+      if (cbActiveGroup[platform] === removed.id) cbActiveGroup[platform] = null;
+    }
+    cbSave();
+    cbRenderGroupManage(platform);
+    cbRenderListFor(platform);
+    return;
+  }
+});
+
+document.getElementById('channel-browser').addEventListener('change', (e) => {
+  const renameInput = e.target.closest('[data-cb-group-rename]');
+  if (!renameInput) return;
+  const [platform, idxStr] = renameInput.dataset.cbGroupRename.split(':');
+  const name = renameInput.value.trim();
+  if (!name) return;
+  cbGroups[platform][Number(idxStr)].name = name;
+  cbSave();
+  cbRenderGroupBar(platform);
+});
+
+document.getElementById('channel-browser').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const m = /^cb-group-new-(youtube|twitch)$/.exec(e.target.id || '');
+  if (!m) return;
+  document.querySelector(`[data-cb-group-add="${m[1]}"]`).click();
+});
 
 function cbOpen() {
   cbRenderYtList();
@@ -1202,6 +1380,8 @@ async function cbYtAdd() {
   try {
     const ch = await cbResolveYouTubeChannel(input);
     if (!cbFavorites.youtube.some(c => c.channelId === ch.channelId)) {
+      const active = cbActiveGroup.youtube;
+      ch.groupId = (active && active !== 'none') ? active : null;
       cbFavorites.youtube.push(ch);
       cbSave();
     }
@@ -1267,7 +1447,9 @@ async function cbTwAdd() {
 
   if (!cbFavorites.twitch.some(c => c.username === username)) {
     const thumbnailUrl = await cbFetchTwitchThumbnail(username);
-    cbFavorites.twitch.push({ username, thumbnailUrl });
+    const active = cbActiveGroup.twitch;
+    const groupId = (active && active !== 'none') ? active : null;
+    cbFavorites.twitch.push({ username, thumbnailUrl, groupId });
     cbSave();
   }
   document.getElementById('cb-tw-input').value = '';
@@ -1366,15 +1548,13 @@ document.getElementById('cb-yt-list').addEventListener('click', (e) => {
 
   const upIdx = e.target.dataset.cbYtUp;
   if (upIdx != null) {
-    const i = Number(upIdx);
-    [cbFavorites.youtube[i - 1], cbFavorites.youtube[i]] = [cbFavorites.youtube[i], cbFavorites.youtube[i - 1]];
+    cbSwapWithFilteredNeighbor('youtube', Number(upIdx), -1);
     cbSave(); cbRenderYtList(); return;
   }
 
   const downIdx = e.target.dataset.cbYtDown;
   if (downIdx != null) {
-    const i = Number(downIdx);
-    [cbFavorites.youtube[i], cbFavorites.youtube[i + 1]] = [cbFavorites.youtube[i + 1], cbFavorites.youtube[i]];
+    cbSwapWithFilteredNeighbor('youtube', Number(downIdx), 1);
     cbSave(); cbRenderYtList(); return;
   }
 
@@ -1409,15 +1589,13 @@ document.getElementById('cb-tw-list').addEventListener('click', (e) => {
 
   const upIdx = e.target.dataset.cbTwUp;
   if (upIdx != null) {
-    const i = Number(upIdx);
-    [cbFavorites.twitch[i - 1], cbFavorites.twitch[i]] = [cbFavorites.twitch[i], cbFavorites.twitch[i - 1]];
+    cbSwapWithFilteredNeighbor('twitch', Number(upIdx), -1);
     cbSave(); cbRenderTwList(); return;
   }
 
   const downIdx = e.target.dataset.cbTwDown;
   if (downIdx != null) {
-    const i = Number(downIdx);
-    [cbFavorites.twitch[i], cbFavorites.twitch[i + 1]] = [cbFavorites.twitch[i + 1], cbFavorites.twitch[i]];
+    cbSwapWithFilteredNeighbor('twitch', Number(downIdx), 1);
     cbSave(); cbRenderTwList(); return;
   }
 
@@ -1503,8 +1681,10 @@ cbLoad();
 
 function cbExport() {
   const data = {
-    yt: cbFavorites.youtube.map(ch => ({ i: ch.channelId, n: ch.name })),
-    tw: cbFavorites.twitch.map(ch => ({ u: ch.username })),
+    yt: cbFavorites.youtube.map(ch => ({ i: ch.channelId, n: ch.name, g: ch.groupId || undefined })),
+    tw: cbFavorites.twitch.map(ch => ({ u: ch.username, g: ch.groupId || undefined })),
+    gy: cbGroups.youtube.map(g => ({ i: g.id, n: g.name })),
+    gt: cbGroups.twitch.map(g => ({ i: g.id, n: g.name })),
   };
   const json = JSON.stringify(data);
   // URL-safe base64: +→- /→_ =省略。% エンコード不要になりアプリ経由でも壊れない
@@ -1523,16 +1703,27 @@ function cbImport(b64raw) {
       Array.from(atob(b64), c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
     );
     const data = JSON.parse(json);
+
+    // グループを先に取り込む（同じ id が無ければ追加。チャンネル側の groupId 参照を維持するため id はそのまま流用）
+    for (const g of (data.gy || [])) {
+      if (g.i && !cbGroups.youtube.some(x => x.id === g.i)) cbGroups.youtube.push({ id: g.i, name: g.n || g.i });
+    }
+    for (const g of (data.gt || [])) {
+      if (g.i && !cbGroups.twitch.some(x => x.id === g.i)) cbGroups.twitch.push({ id: g.i, name: g.n || g.i });
+    }
+
     let added = 0;
     for (const ch of (data.yt || [])) {
       if (ch.i && !cbFavorites.youtube.some(c => c.channelId === ch.i)) {
-        cbFavorites.youtube.push({ channelId: ch.i, name: ch.n || ch.i, thumbnailUrl: null, liveVideoId: null, liveTitle: null });
+        const groupId = ch.g && cbGroups.youtube.some(g => g.id === ch.g) ? ch.g : null;
+        cbFavorites.youtube.push({ channelId: ch.i, name: ch.n || ch.i, thumbnailUrl: null, groupId, liveVideoId: null, liveTitle: null });
         added++;
       }
     }
     for (const ch of (data.tw || [])) {
       if (ch.u && !cbFavorites.twitch.some(c => c.username === ch.u)) {
-        cbFavorites.twitch.push({ username: ch.u });
+        const groupId = ch.g && cbGroups.twitch.some(g => g.id === ch.g) ? ch.g : null;
+        cbFavorites.twitch.push({ username: ch.u, groupId });
         added++;
       }
     }

@@ -655,6 +655,36 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 }
 .btn-sort-reset:hover { background: #16a34a; color: #fff; }
 
+/* ===== チャンネルのグループ分け（タブ） ===== */
+.cb-group-bar { display: flex; flex-wrap: wrap; gap: 5px; }
+.cb-group-chip {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #1a1a2a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.cb-group-chip:hover { background: #2a2a3a; color: #e0e0e0; }
+.cb-group-chip.is-active { background: #2a1a4a; border-color: #7c3aed; color: #c4b5fd; }
+.cb-group-chip.cb-group-manage-toggle { margin-left: auto; color: #4b5563; }
+
+.cb-group-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  background: #1a1a2a;
+  border: 1px solid #2a2a3a;
+  border-radius: 6px;
+}
+.cb-group-manage-row { display: flex; align-items: center; gap: 5px; }
+.cb-group-manage-row .cb-name { flex: 1; min-width: 0; font-size: 12px; padding: 4px 8px; }
+
 /* ===== Player Shield (スライダー表示中の iframe タッチ横取り防止) ===== */
 .player-shield {
   position: absolute;
