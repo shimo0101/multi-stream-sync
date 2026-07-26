@@ -1141,7 +1141,22 @@ async function cbResolveYouTubeChannel(input) {
 }
 
 // YouTube: ライブ配信中の動画を取得
-async function cbFetchYouTubeLive(channelId) {
+function cbSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// 配列を「同時実行数を制限しながら」処理する（1件ずつ全チャンネル分APIを叩く処理が
+// 登録数の多さで一斉並行実行になり、YouTube側にレート制限(429)されるのを防ぐ）
+async function cbRunLimited(items, limit, fn) {
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+async function cbFetchYouTubeLive(channelId, retriesLeft = 2) {
   const apiKey = settings.ytApiKey;
   if (!apiKey) return null;
 
@@ -1155,6 +1170,11 @@ async function cbFetchYouTubeLive(channelId) {
 
   try {
     const res = await fetch(url);
+    if (res.status === 429 && retriesLeft > 0) {
+      // レート制限。少し待って再試行する
+      await cbSleep(800);
+      return cbFetchYouTubeLive(channelId, retriesLeft - 1);
+    }
     if (!res.ok) return null;
     const data = await res.json();
     const item = data.items?.[0];
@@ -1479,11 +1499,12 @@ document.getElementById('cb-yt-refresh').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = '確認中…';
 
-  await Promise.all(cbFavorites.youtube.map(async (ch, i) => {
+  // 同時実行数を3に制限（登録チャンネルが多くてもYouTube側のレート制限(429)を避ける）
+  await cbRunLimited(cbFavorites.youtube, 3, async (ch, i) => {
     const live = await cbFetchYouTubeLive(ch.channelId);
     cbFavorites.youtube[i].liveVideoId = live?.videoId ?? null;
     cbFavorites.youtube[i].liveTitle   = live?.title   ?? null;
-  }));
+  });
 
   cbYtLiveSorted = true;
   cbRenderYtList();
