@@ -695,7 +695,7 @@ function savePlaybackPosition(key, pos) {
   } catch {}
 }
 
-const RESUME_END_MARGIN = 30; // 動画の残りがこの秒数未満なら「見終わった」とみなしレジュームしない
+const RESUME_END_MARGIN = 5; // 動画の残りがこの秒数未満なら「見終わった」とみなしレジュームしない
 
 // "PT1H2M3S" → 3723（YouTubeのISO8601動画長）
 function isoDurationToSeconds(iso) {
