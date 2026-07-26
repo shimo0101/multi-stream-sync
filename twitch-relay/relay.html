@@ -8,6 +8,9 @@
     popup モード: window.open() で開いた場合 → window.opener と通信
     iframe モード: iframe で埋め込んだ場合   → window.parent と通信（後方互換）
 
+  URL パラメータ（video 読み込み時のみ）:
+    time = 再生開始位置（秒、省略可。channel(ライブ)読み込み時は無視される）
+
   postMessage プロトコル:
     ホスト → relay:  { type: 'seek',           data: { time: number } }
     ホスト → relay:  { type: 'getCurrentTime' }
@@ -45,6 +48,16 @@
     const video    = params.get('video');
     const parent   = params.get('parent') || location.hostname || 'localhost';
     const isMuted  = params.get('muted') === '1';
+    const startSecs = Math.max(0, parseInt(params.get('time'), 10) || 0);
+
+    // 秒 → Twitch Embed の time オプション形式（例: 90 → "0h1m30s"）
+    function secondsToTwitchTime(seconds) {
+      const s = Math.max(0, Math.floor(seconds));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return `${h}h${m}m${sec}s`;
+    }
 
     // popup モード: window.open() で開かれた場合は window.opener と通信
     // iframe モード: iframe 埋め込みの場合は window.parent と通信
@@ -73,8 +86,12 @@
         muted:    isMuted,
         parent:   [parent],
       };
-      if (channel) options.channel = channel;
-      else         options.video   = String(video).replace(/^v/, '');
+      if (channel) {
+        options.channel = channel;
+      } else {
+        options.video = String(video).replace(/^v/, '');
+        if (startSecs > 0) options.time = secondsToTwitchTime(startSecs);
+      }
 
       const player = new Twitch.Player('player', options);
 

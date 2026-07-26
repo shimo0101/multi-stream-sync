@@ -119,6 +119,7 @@ class PanelController {
     this.idx           = idx;
     this.platform      = null;
     this.loadedId      = null;
+    this.resumeKey     = null; // レジューム再生用キー（'youtube:videoId' / 'twitch:VOD id'。ライブは対象外でnull）
     this.startTimeSecs = null;
     this.overlay       = new CommentOverlay(document.getElementById(`canvas-${idx}`));
 
@@ -156,8 +157,9 @@ class PanelController {
     this._ytChat?.isRunning()   && this._ytChat.stop();
     this._twChat?.isConnected() && this._twChat.disconnect();
 
-    this.platform = platform;
-    this.loadedId = null;
+    this.platform  = platform;
+    this.loadedId  = null;
+    this.resumeKey = null;
 
     document.getElementById(`player-${this.idx}`).innerHTML = '';
 
@@ -252,10 +254,14 @@ class PanelController {
       if (!videoId) { setStatus('YouTube: 有効なURLまたは動画IDを入力してください', 'error'); return; }
       this._ytChat?.isRunning() && this._ytChat.stop();
       document.getElementById(`btn-chat-${this.idx}`).disabled = true;
-      this.loadedId = videoId;
-      player.load(videoId, { muted: this.isMuted });
+      this.loadedId  = videoId;
+      this.resumeKey = `youtube:${videoId}`;
+      const savedPos = getPlaybackPosition(this.resumeKey);
+      player.load(videoId, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
-      setStatus(`P${this.idx + 1} YouTube: "${videoId}" を読み込み中…`);
+      setStatus(savedPos
+        ? `P${this.idx + 1} YouTube: "${videoId}" を読み込み中…（前回の続き ${formatHMS(savedPos)}〜）`
+        : `P${this.idx + 1} YouTube: "${videoId}" を読み込み中…`);
     } else {
       const parsed = parseTwitchInput(rawUrl);
       if (!parsed) { setStatus('Twitch: 有効なチャンネル名またはVOD URLを入力してください', 'error'); return; }
@@ -267,10 +273,15 @@ class PanelController {
       }
       this._twChat?.isConnected() && this._twChat.disconnect();
       document.getElementById(`btn-chat-${this.idx}`).disabled = true;
-      this.loadedId = parsed.type === 'channel' ? parsed.id : null;
-      player.load(parsed.id, parsed.type, { muted: this.isMuted });
+      this.loadedId  = parsed.type === 'channel' ? parsed.id : null;
+      // レジューム対象はVOD（録画）のみ。ライブチャンネルには resumeKey を設定しない
+      this.resumeKey = parsed.type === 'video' ? `twitch:${parsed.id}` : null;
+      const savedPos = getPlaybackPosition(this.resumeKey);
+      player.load(parsed.id, parsed.type, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
-      setStatus(`P${this.idx + 1} Twitch: "${parsed.id}" を読み込み中…`);
+      setStatus(savedPos
+        ? `P${this.idx + 1} Twitch: "${parsed.id}" を読み込み中…（前回の続き ${formatHMS(savedPos)}〜）`
+        : `P${this.idx + 1} Twitch: "${parsed.id}" を読み込み中…`);
     }
   }
 
@@ -652,6 +663,46 @@ function parseHMS(str) {
   if (m >= 60 || s >= 60) return null;
   return h * 3600 + m * 60 + s;
 }
+
+// ===== 再生位置の引き継ぎ（レジューム再生） =====
+
+const PLAYBACK_POS_KEY = 'mss-playback-positions';
+const PLAYBACK_POS_MAX = 300; // 保存件数の上限（超えたら古い順に削除）
+const PLAYBACK_POS_MIN = 15;  // これ未満の再生位置は保存しない（最初からとほぼ同じため）
+const PLAYBACK_POLL_MS = 5000;
+
+function loadPlaybackPositions() {
+  try { return JSON.parse(localStorage.getItem(PLAYBACK_POS_KEY) || '{}'); } catch { return {}; }
+}
+
+function getPlaybackPosition(key) {
+  if (!key) return null;
+  const pos = loadPlaybackPositions()[key]?.pos;
+  return (typeof pos === 'number' && pos > 0) ? pos : null;
+}
+
+function savePlaybackPosition(key, pos) {
+  if (!key || pos < PLAYBACK_POS_MIN) return;
+  try {
+    const all = loadPlaybackPositions();
+    all[key] = { pos, at: Date.now() };
+    const keys = Object.keys(all);
+    if (keys.length > PLAYBACK_POS_MAX) {
+      keys.sort((a, b) => all[a].at - all[b].at);
+      for (const k of keys.slice(0, keys.length - PLAYBACK_POS_MAX)) delete all[k];
+    }
+    localStorage.setItem(PLAYBACK_POS_KEY, JSON.stringify(all));
+  } catch {}
+}
+
+// パネルで再生中の動画（resumeKey が設定されているもの＝ライブ以外）の再生位置を定期的に保存する
+setInterval(() => {
+  for (const p of panels) {
+    if (!p.resumeKey) continue;
+    const t = p.player?.getCurrentTime?.();
+    if (typeof t === 'number' && t > 0) savePlaybackPosition(p.resumeKey, t);
+  }
+}, PLAYBACK_POLL_MS);
 
 // ===== YouTube 配信開始時刻の自動取得 =====
 

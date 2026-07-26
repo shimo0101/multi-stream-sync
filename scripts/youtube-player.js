@@ -27,7 +27,7 @@ export class YouTubePlayer {
     });
   }
 
-  load(videoId, { muted = false } = {}) {
+  load(videoId, { muted = false, startSeconds = 0 } = {}) {
     const container = document.getElementById(this.#containerId);
     if (!container) return;
 
@@ -44,6 +44,7 @@ export class YouTubePlayer {
     const url = new URL(this.#relayUrl);
     url.searchParams.set('v', videoId);
     if (muted) url.searchParams.set('muted', '1');
+    if (startSeconds > 0) url.searchParams.set('start', String(Math.floor(startSeconds)));
 
     const iframe = document.createElement('iframe');
     iframe.src           = url.toString();

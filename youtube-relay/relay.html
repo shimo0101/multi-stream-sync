@@ -10,7 +10,8 @@
     → relay URL: http://localhost:8080/youtube-relay/relay.html
 
   URL パラメータ:
-    v = YouTube 動画ID
+    v     = YouTube 動画ID
+    start = 再生開始位置（秒、省略可。ライブ配信では無視される）
 
   通信プロトコル (postMessage):
     relay → 親: { type: 'ytReady' }
@@ -47,6 +48,7 @@
     const params   = new URLSearchParams(location.search);
     const videoId  = params.get('v');
     const isMuted  = params.get('muted') === '1';
+    const startSecs = Math.max(0, parseInt(params.get('start'), 10) || 0);
 
     function showError(msg) {
       const el = document.getElementById('error');
@@ -61,7 +63,10 @@
         videoId,
         width:  '100%',
         height: '100%',
-        playerVars: { controls: 1, rel: 0, autoplay: 0, playsinline: 1 },
+        playerVars: {
+          controls: 1, rel: 0, autoplay: 0, playsinline: 1,
+          ...(startSecs > 0 ? { start: startSecs } : {}),
+        },
         events: {
           onReady() {
             if (isMuted) player.mute();

@@ -8,6 +8,15 @@
  *     外部サーバーの relay.html を iframe で埋め込み postMessage で制御する。
  *     Twitch の frame-ancestors CSP は background.js の webRequest で除去済み。
  */
+// 秒 → Twitch Embed の time オプション形式（例: 90 → "0h1m30s"）
+function secondsToTwitchTime(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h}h${m}m${sec}s`;
+}
+
 export class TwitchPlayer {
   #mode = 'sdk';
   #sdk = null;
@@ -30,8 +39,10 @@ export class TwitchPlayer {
     if (relayUrl) this.#setupMsgListener();
   }
 
-  load(id, type = 'channel', { muted = false } = {}) {
-    this.#mode === 'relay' ? this.#loadRelay(id, type, muted) : this.#loadSdk(id, type, muted);
+  load(id, type = 'channel', { muted = false, startSeconds = 0 } = {}) {
+    this.#mode === 'relay'
+      ? this.#loadRelay(id, type, muted, startSeconds)
+      : this.#loadSdk(id, type, muted, startSeconds);
   }
 
   getCurrentTime() {
@@ -91,18 +102,22 @@ export class TwitchPlayer {
 
   // ===== SDK モード =====
 
-  #loadSdk(id, type, muted = false) {
-    if (window.Twitch?.Player) { this.#createSdkPlayer(id, type, muted); return; }
+  #loadSdk(id, type, muted = false, startSeconds = 0) {
+    if (window.Twitch?.Player) { this.#createSdkPlayer(id, type, muted, startSeconds); return; }
     const s = document.createElement('script');
     s.src = 'https://player.twitch.tv/js/embed/v1.js';
-    s.onload = () => this.#createSdkPlayer(id, type, muted);
+    s.onload = () => this.#createSdkPlayer(id, type, muted, startSeconds);
     document.head.appendChild(s);
   }
 
-  #createSdkPlayer(id, type, muted = false) {
+  #createSdkPlayer(id, type, muted = false, startSeconds = 0) {
     const options = { width: '100%', height: '100%', autoplay: false, muted, parent: [this.#parent] };
-    if (type === 'channel') options.channel = id;
-    else                    options.video   = id.replace(/^v/, '');
+    if (type === 'channel') {
+      options.channel = id;
+    } else {
+      options.video = id.replace(/^v/, '');
+      if (startSeconds > 0) options.time = secondsToTwitchTime(startSeconds);
+    }
     this.#sdk = new Twitch.Player(this.#containerId, options);
     this.#sdk.addEventListener(Twitch.Player.READY, () => this.#callbacks.onReady(this));
   }
@@ -124,7 +139,7 @@ export class TwitchPlayer {
     window.addEventListener('message', this.#msgHandler);
   }
 
-  #loadRelay(id, type, muted = false) {
+  #loadRelay(id, type, muted = false, startSeconds = 0) {
     const container = document.getElementById(this.#containerId);
     if (!container) return;
 
@@ -135,8 +150,12 @@ export class TwitchPlayer {
     container.innerHTML = '';
 
     const url = new URL(this.#relayUrl);
-    if (type === 'channel') url.searchParams.set('channel', id);
-    else                    url.searchParams.set('video',   id);
+    if (type === 'channel') {
+      url.searchParams.set('channel', id);
+    } else {
+      url.searchParams.set('video', id);
+      if (startSeconds > 0) url.searchParams.set('time', String(Math.floor(startSeconds)));
+    }
     if (muted) url.searchParams.set('muted', '1');
 
     const iframe = document.createElement('iframe');
