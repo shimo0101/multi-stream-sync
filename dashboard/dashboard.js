@@ -108,6 +108,13 @@ function createPanelHTML(idx) {
                  min="0" max="100" step="1" value="100">
           <span class="volume-label" id="vol-label-${idx}">100%</span>
         </div>
+        <button id="btn-nudge-${idx}" class="btn--nudge" title="再生位置を補正（同期のズレをその場で直す）">⏱</button>
+        <div class="nudge-bar" id="nudge-bar-${idx}" hidden>
+          <button class="btn--nudge-adj" data-panel="${idx}" data-delta="-5">−5s</button>
+          <button class="btn--nudge-adj" data-panel="${idx}" data-delta="-1">−1s</button>
+          <button class="btn--nudge-adj" data-panel="${idx}" data-delta="1">+1s</button>
+          <button class="btn--nudge-adj" data-panel="${idx}" data-delta="5">+5s</button>
+        </div>
       </div>
     </section>`;
 }
@@ -298,6 +305,22 @@ class PanelController {
     saveSettings({ [`p${this.idx}Start`]: hms });
   }
 
+  // 再生中に徐々にズレていく同期を、配信開始時刻を経由せずその場で直接補正する
+  nudgePlayback(deltaSecs) {
+    if (!this.player?.isReady?.()) {
+      setStatus(`P${this.idx + 1} が未準備です`, 'error');
+      return;
+    }
+    const current = this.player.getCurrentTime?.();
+    if (current == null) {
+      setStatus(`P${this.idx + 1} の再生位置を取得できませんでした`, 'error');
+      return;
+    }
+    const target = Math.max(0, current + deltaSecs);
+    this.player.seekTo(target);
+    setStatus(`P${this.idx + 1} を ${deltaSecs > 0 ? '+' : ''}${deltaSecs}s 補正しました（${formatHMS(target)}〜）`, 'ok');
+  }
+
   destroy() {
     this._ytChat?.isRunning()   && this._ytChat.stop();
     this._twChat?.isConnected() && this._twChat.disconnect();
@@ -461,6 +484,14 @@ function bindPanelEvents(idx) {
     btn.addEventListener('click', () => panels[idx].adjustStartTime(Number(btn.dataset.delta)));
   });
 
+  // 音量スライダー・再生位置補正バーは排他表示（同時に開かない）にし、
+  // どちらか片方でも開いていればシールドで iframe タッチを吸収する
+  function updatePlayerOverlayShield() {
+    const volBar   = document.getElementById(`vol-bar-${idx}`);
+    const nudgeBar = document.getElementById(`nudge-bar-${idx}`);
+    document.getElementById(`player-shield-${idx}`).hidden = volBar.hidden && nudgeBar.hidden;
+  }
+
   // iOS: ミュートトグル / PC・Android: 音量スライダートグル
   const _muteBtn = document.getElementById(`btn-mute-${idx}`);
   if (isIOS) {
@@ -471,13 +502,37 @@ function bindPanelEvents(idx) {
     _muteBtn.textContent = '🔊';
     _muteBtn.title = '音量調整';
     _muteBtn.addEventListener('click', () => {
-      const volBar  = document.getElementById(`vol-bar-${idx}`);
-      const shield  = document.getElementById(`player-shield-${idx}`);
-      volBar.hidden  = !volBar.hidden;
-      shield.hidden  = volBar.hidden;  // スライダー表示中はシールドで iframe タッチを吸収
+      const volBar   = document.getElementById(`vol-bar-${idx}`);
+      const nudgeBar = document.getElementById(`nudge-bar-${idx}`);
+      const opening  = volBar.hidden;
+      if (opening) {
+        nudgeBar.hidden = true;
+        document.getElementById(`btn-nudge-${idx}`).classList.remove('is-nudge-open');
+      }
+      volBar.hidden = !opening;
       _muteBtn.classList.toggle('is-vol-open', !volBar.hidden);
+      updatePlayerOverlayShield();
     });
   }
+
+  // 再生位置の補正トグル（同期ズレをその場で直す）
+  const _nudgeBtn = document.getElementById(`btn-nudge-${idx}`);
+  _nudgeBtn.addEventListener('click', () => {
+    const nudgeBar = document.getElementById(`nudge-bar-${idx}`);
+    const volBar   = document.getElementById(`vol-bar-${idx}`);
+    const opening  = nudgeBar.hidden;
+    if (opening && !isIOS) {
+      volBar.hidden = true;
+      _muteBtn.classList.remove('is-vol-open');
+    }
+    nudgeBar.hidden = !opening;
+    _nudgeBtn.classList.toggle('is-nudge-open', !nudgeBar.hidden);
+    updatePlayerOverlayShield();
+  });
+
+  document.querySelectorAll(`.btn--nudge-adj[data-panel="${idx}"]`).forEach(btn => {
+    btn.addEventListener('click', () => panels[idx].nudgePlayback(Number(btn.dataset.delta)));
+  });
 
   // 折りたたみボタン
   document.getElementById(`btn-collapse-${idx}`).addEventListener('click', () => {
