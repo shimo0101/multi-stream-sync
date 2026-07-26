@@ -318,6 +318,20 @@
     }
     .btn-panel:hover { background: #2563eb; color: #fff; }
 
+    .btn-add-channel {
+      margin-left: auto;
+      padding: 3px 9px; font-size: 11px; font-weight: 700;
+      background: transparent; color: #a78bfa;
+      border: 1px solid #4a3a7a; border-radius: 4px;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: background 0.1s;
+    }
+    .btn-add-channel:hover:not(:disabled) { background: #2a1a4a; }
+    .btn-add-channel:disabled { opacity: 0.5; cursor: default; }
+    .channel-registered {
+      margin-left: auto; font-size: 11px; color: #6b7280; white-space: nowrap; flex-shrink: 0;
+    }
+
     /* ===== Pagination (YouTube) ===== */
     .pagination {
       display: flex; align-items: center; justify-content: center;
@@ -597,6 +611,9 @@
     // caches[key] = { items: [...正規化済み動画], loadedAt, exhausted, cursor, perChannel? }
     let caches   = {};
     let viewPage = 0; // キャッシュ内の表示ページ（0始まり）
+
+    // 'all' モードの直近検索結果（チャンネル登録後の再描画に使用）
+    let lastAllItems = [];
 
     // ===== Load localStorage =====
 
@@ -1125,8 +1142,9 @@
         const data    = await res.json();
         nextPageToken = data.nextPageToken || null;
         currentToken  = pageToken;
+        lastAllItems  = data.items || [];
 
-        renderResults(data.items || []);
+        renderResults(lastAllItems);
         updatePaginationUI();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
@@ -1410,6 +1428,14 @@
           `<button class="btn-panel" data-video-id="${escHtml(videoId)}" data-panel="${pi}">P${pi + 1}</button>`
         ).join('');
 
+        // キーワード検索（'all'）結果のみ: 動画のチャンネルをその場でお気に入り登録できるようにする
+        let channelRegHtml = '';
+        if (feedMode === 'all' && sn.channelId) {
+          channelRegHtml = ytFavorites.some(ch => ch.channelId === sn.channelId)
+            ? '<span class="channel-registered">✓ 登録済み</span>'
+            : `<button class="btn-add-channel" data-channel-id="${escHtml(sn.channelId)}" data-channel-title="${escHtml(sn.channelTitle)}">+ チャンネル登録</button>`;
+        }
+
         const card = document.createElement('div');
         card.className = 'video-card';
         card.innerHTML = `
@@ -1424,6 +1450,7 @@
           <div class="video-panel-row">
             <span class="panel-label">開く→</span>
             ${panelBtns}
+            ${channelRegHtml}
           </div>`;
         grid.appendChild(card);
       }
@@ -1439,6 +1466,45 @@
           ダッシュボードの <strong>⚙ 共通設定</strong> から
           <code>YouTube API Key</code> を入力して保存してから、このページを開き直してください。
         </div>`;
+    }
+
+    // ===== 動画検索結果からのチャンネル登録 =====
+
+    function saveFavorites() {
+      try {
+        localStorage.setItem(FAV_KEY, JSON.stringify({ youtube: ytFavorites, twitch: twFavorites }));
+      } catch {}
+    }
+
+    async function fetchChannelThumbnail(channelId) {
+      const url = new URL('https://www.googleapis.com/youtube/v3/channels');
+      url.searchParams.set('part', 'snippet');
+      url.searchParams.set('id',   channelId);
+      url.searchParams.set('key',  apiKey);
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.items?.[0]?.snippet?.thumbnails?.default?.url ?? null;
+    }
+
+    async function addChannelFavorite(channelId, channelTitle, btn) {
+      if (ytFavorites.some(ch => ch.channelId === channelId)) return;
+
+      btn.disabled    = true;
+      btn.textContent = '登録中…';
+
+      try {
+        const thumbnailUrl = await fetchChannelThumbnail(channelId);
+        ytFavorites.push({ channelId, name: channelTitle, thumbnailUrl });
+        saveFavorites();
+        renderChips();
+        if (feedMode === 'all') renderResults(lastAllItems);
+        showToast(`チャンネル "${channelTitle}" を登録しました`);
+      } catch (err) {
+        showToast(`登録エラー: ${err.message}`, 'warn');
+        btn.disabled    = false;
+        btn.textContent = '+ チャンネル登録';
+      }
     }
 
     // ===== Toast =====
@@ -1545,11 +1611,17 @@
       }
     });
 
-    // YouTube 動画パネルボタン（イベント委譲）
+    // YouTube 動画パネルボタン & チャンネル登録ボタン（イベント委譲）
     document.getElementById('results').addEventListener('click', e => {
-      const btn = e.target.closest('.btn-panel[data-video-id]');
-      if (!btn) return;
-      sendToPanel(btn.dataset.videoId, Number(btn.dataset.panel), 'youtube');
+      const panelBtn = e.target.closest('.btn-panel[data-video-id]');
+      if (panelBtn) {
+        sendToPanel(panelBtn.dataset.videoId, Number(panelBtn.dataset.panel), 'youtube');
+        return;
+      }
+      const addBtn = e.target.closest('.btn-add-channel');
+      if (addBtn) {
+        addChannelFavorite(addBtn.dataset.channelId, addBtn.dataset.channelTitle, addBtn);
+      }
     });
 
     // ===== Init =====
