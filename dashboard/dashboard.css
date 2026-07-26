@@ -685,6 +685,32 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .cb-group-manage-row { display: flex; align-items: center; gap: 5px; }
 .cb-group-manage-row .cb-name { flex: 1; min-width: 0; font-size: 12px; padding: 4px 8px; }
 
+/* 並べ替え・削除・グループ移動は誤操作防止のため編集モード時のみ表示する */
+.cb-list-toolbar { display: flex; justify-content: flex-end; }
+.cb-edit-toggle {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
+}
+.cb-edit-toggle:hover { color: #c4b5fd; border-color: #4a4a6a; }
+.cb-edit-toggle.is-active { background: #2a1a4a; border-color: #7c3aed; color: #c4b5fd; }
+
+.cb-group-select {
+  font-size: 11px;
+  padding: 3px 5px;
+  background: #1a1a2a;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  max-width: 120px;
+}
+
 /* ===== Player Shield (スライダー表示中の iframe タッチ横取り防止) ===== */
 .player-shield {
   position: absolute;

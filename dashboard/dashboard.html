@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="../icons/icon-96.png">
   <link rel="manifest" href="pwa.webmanifest">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=30">
+  <link rel="stylesheet" href="dashboard.css?v=31">
 </head>
 <body>
 
@@ -112,6 +112,9 @@
       </div>
       <div class="cb-group-bar" id="cb-yt-group-bar"></div>
       <div class="cb-group-manage" id="cb-yt-group-manage" hidden></div>
+      <div class="cb-list-toolbar">
+        <button id="cb-yt-edit-toggle" class="cb-edit-toggle">✏ 編集</button>
+      </div>
       <ul class="cb-list" id="cb-yt-list"></ul>
     </div>
     <div class="cb-pane cb-pane--hidden" id="cb-pane-twitch">
@@ -129,6 +132,9 @@
       </div>
       <div class="cb-group-bar" id="cb-tw-group-bar"></div>
       <div class="cb-group-manage" id="cb-tw-group-manage" hidden></div>
+      <div class="cb-list-toolbar">
+        <button id="cb-tw-edit-toggle" class="cb-edit-toggle">✏ 編集</button>
+      </div>
       <ul class="cb-list" id="cb-tw-list"></ul>
     </div>
   </aside>
@@ -136,6 +142,6 @@
   <!-- チャンネルブラウザ バックドロップ（モバイルのみ表示） -->
   <div class="cb-backdrop" id="cb-backdrop"></div>
 
-  <script type="module" src="dashboard.js?v=30"></script>
+  <script type="module" src="dashboard.js?v=31"></script>
 </body>
 </html>

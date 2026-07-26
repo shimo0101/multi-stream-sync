@@ -981,6 +981,18 @@ let cbTwLiveSorted = false;
 let cbGroups       = { youtube: [], twitch: [] };          // [{id, name}]
 let cbActiveGroup  = { youtube: null, twitch: null };      // null=すべて, 'none'=未分類, それ以外=group.id
 
+// 編集モード（並べ替え・削除・グループ移動ボタンは誤操作防止のため通常時は非表示にし、
+// このモードのときだけ表示する）
+let cbEditMode = { youtube: false, twitch: false };
+
+function cbGroupOptionsHtml(platform, currentGroupId) {
+  const opts = [`<option value=""${!currentGroupId ? ' selected' : ''}>未分類</option>`];
+  for (const g of cbGroups[platform]) {
+    opts.push(`<option value="${escHtml(g.id)}"${g.id === currentGroupId ? ' selected' : ''}>${escHtml(g.name)}</option>`);
+  }
+  return opts.join('');
+}
+
 function cbGenGroupId() {
   return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
@@ -1147,12 +1159,16 @@ function cbRenderYtList() {
                      ${ch.liveVideoId ? '' : 'disabled'}>P${pi + 1}</button>`
           ).join('')}
         </div>
+        ${cbEditMode.youtube ? `
+        <select class="cb-group-select" data-cb-yt-group-move="${ch.origIdx}">
+          ${cbGroupOptionsHtml('youtube', ch.groupId)}
+        </select>
         ${!cbYtLiveSorted ? `
         <div class="cb-reorder-row">
           <button class="cb-reorder-btn" data-cb-yt-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
           <button class="cb-reorder-btn" data-cb-yt-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
         </div>` : ''}
-        <button class="cb-del-btn" data-cb-yt-del="${ch.origIdx}">✕</button>
+        <button class="cb-del-btn" data-cb-yt-del="${ch.origIdx}">✕</button>` : ''}
       </div>
     </li>
   `).join('');
@@ -1195,12 +1211,16 @@ function cbRenderTwList() {
             `<button class="cb-open-btn" data-cb-tw-open="${ch.origIdx}" data-panel="${pi}">P${pi + 1}</button>`
           ).join('')}
         </div>
+        ${cbEditMode.twitch ? `
+        <select class="cb-group-select" data-cb-tw-group-move="${ch.origIdx}">
+          ${cbGroupOptionsHtml('twitch', ch.groupId)}
+        </select>
         ${!cbTwLiveSorted ? `
         <div class="cb-reorder-row">
           <button class="cb-reorder-btn" data-cb-tw-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
           <button class="cb-reorder-btn" data-cb-tw-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
         </div>` : ''}
-        <button class="cb-del-btn" data-cb-tw-del="${ch.origIdx}">✕</button>
+        <button class="cb-del-btn" data-cb-tw-del="${ch.origIdx}">✕</button>` : ''}
       </div>
     </li>
   `).join('');
@@ -1622,6 +1642,25 @@ document.getElementById('cb-tw-list').addEventListener('click', (e) => {
   }
 });
 
+// チャンネルのグループ移動（編集モード中のセレクトボックス）
+document.getElementById('cb-yt-list').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-cb-yt-group-move]');
+  if (!sel) return;
+  const i = Number(sel.dataset.cbYtGroupMove);
+  cbFavorites.youtube[i].groupId = sel.value || null;
+  cbSave();
+  cbRenderYtList();
+});
+
+document.getElementById('cb-tw-list').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-cb-tw-group-move]');
+  if (!sel) return;
+  const i = Number(sel.dataset.cbTwGroupMove);
+  cbFavorites.twitch[i].groupId = sel.value || null;
+  cbSave();
+  cbRenderTwList();
+});
+
 // ===== チャンネルブラウザ内ステータス（モバイルで底部ステータスバーが隠れる対策） =====
 
 let cbStatusTimer = null;
@@ -1655,6 +1694,21 @@ document.getElementById('cb-tw-more').addEventListener('click', () => {
   const opening = sec.hidden;
   sec.hidden = !opening;
   btn.textContent = opening ? '▲' : '▼';
+});
+
+// 編集モード切替（並べ替え・削除・グループ移動ボタンの誤操作防止）
+document.getElementById('cb-yt-edit-toggle').addEventListener('click', () => {
+  cbEditMode.youtube = !cbEditMode.youtube;
+  document.getElementById('cb-yt-edit-toggle').classList.toggle('is-active', cbEditMode.youtube);
+  document.getElementById('cb-yt-edit-toggle').textContent = cbEditMode.youtube ? '✓ 完了' : '✏ 編集';
+  cbRenderYtList();
+});
+
+document.getElementById('cb-tw-edit-toggle').addEventListener('click', () => {
+  cbEditMode.twitch = !cbEditMode.twitch;
+  document.getElementById('cb-tw-edit-toggle').classList.toggle('is-active', cbEditMode.twitch);
+  document.getElementById('cb-tw-edit-toggle').textContent = cbEditMode.twitch ? '✓ 完了' : '✏ 編集';
+  cbRenderTwList();
 });
 
 // picker ページからの BroadcastChannel メッセージを受信
