@@ -1599,20 +1599,34 @@ document.getElementById('cb-yt-more').addEventListener('click', () => {
   btn.textContent = opening ? '▲' : '▼';
 });
 
+// Twitch API 共通ヘルパー。401（トークン失効）を検知したらトークンを破棄し、
+// 呼び出し元で判別できるよう 'TW_AUTH_EXPIRED' を投げる
+async function cbTwitchFetch(url, token, clientId) {
+  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': clientId } });
+  if (res.status === 401) {
+    localStorage.removeItem('mss-tw-token');
+    throw new Error('TW_AUTH_EXPIRED');
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// 認証エラーかどうかに応じて分かりやすいメッセージを返す
+function cbTwitchErrorMessage(err, fallback) {
+  return err?.message === 'TW_AUTH_EXPIRED'
+    ? 'Twitch 認証が切れました。picker（動画を探す）ページで再ログインしてください'
+    : fallback;
+}
+
 // Twitch: 登録時にプロフィール画像を取得（token・clientId がなければ null）
 async function cbFetchTwitchThumbnail(username) {
   const token    = localStorage.getItem('mss-tw-token');
   const clientId = settings.twClientId;
   if (!token || !clientId) return null;
-  try {
-    const res = await fetch(
-      `https://api.twitch.tv/helix/users?login=${encodeURIComponent(username)}`,
-      { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': clientId } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.data?.[0]?.profile_image_url ?? null;
-  } catch { return null; }
+  const data = await cbTwitchFetch(
+    `https://api.twitch.tv/helix/users?login=${encodeURIComponent(username)}`, token, clientId
+  );
+  return data.data?.[0]?.profile_image_url ?? null;
 }
 
 // Twitch: 追加
@@ -1621,16 +1635,26 @@ async function cbTwAdd() {
   if (!username) return;
   if (!/^[a-z0-9_]{1,25}$/.test(username)) { cbSetStatus('無効なチャンネル名です', 'error'); return; }
 
+  let authMsg = null;
   if (!cbFavorites.twitch.some(c => c.username === username)) {
-    const thumbnailUrl = await cbFetchTwitchThumbnail(username);
-    const active = cbActiveGroup.twitch;
+    let thumbnailUrl = null;
+    try {
+      thumbnailUrl = await cbFetchTwitchThumbnail(username);
+    } catch (err) {
+      // サムネイル取得の失敗は致命的ではないため追加自体は続行する
+      authMsg = cbTwitchErrorMessage(err, null);
+    }
+    const active  = cbActiveGroup.twitch;
     const groupId = (active && active !== 'none') ? active : null;
     cbFavorites.twitch.push({ username, thumbnailUrl, groupId });
     cbSave();
   }
   document.getElementById('cb-tw-input').value = '';
   cbRenderTwList();
-  cbSetStatus(`Twitch "${username}" を追加しました`, 'ok');
+  cbSetStatus(
+    authMsg ? `Twitch "${username}" を追加しました（${authMsg}）` : `Twitch "${username}" を追加しました`,
+    'ok'
+  );
 }
 
 document.getElementById('cb-tw-add').addEventListener('click', cbTwAdd);
@@ -1643,15 +1667,10 @@ async function cbFetchTwitchLiveStreams() {
   if (!token || !clientId) return null;
   const query = cbFavorites.twitch
     .map(ch => `user_login=${encodeURIComponent(ch.username)}`).join('&');
-  try {
-    const res = await fetch(
-      `https://api.twitch.tv/helix/streams?${query}&first=100`,
-      { headers: { 'Authorization': `Bearer ${token}`, 'Client-Id': clientId } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.data ?? [];
-  } catch { return null; }
+  const data = await cbTwitchFetch(
+    `https://api.twitch.tv/helix/streams?${query}&first=100`, token, clientId
+  );
+  return data.data ?? [];
 }
 
 document.getElementById('cb-tw-live').addEventListener('click', async () => {
@@ -1664,7 +1683,15 @@ document.getElementById('cb-tw-live').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = '確認中…';
 
-  const streams = await cbFetchTwitchLiveStreams();
+  let streams = null;
+  try {
+    streams = await cbFetchTwitchLiveStreams();
+  } catch (err) {
+    cbSetStatus(cbTwitchErrorMessage(err, 'ライブ確認に失敗しました'), 'error');
+    btn.disabled    = false;
+    btn.textContent = 'ライブ確認';
+    return;
+  }
   if (streams === null) {
     cbSetStatus('ライブ確認に失敗しました', 'error');
   } else {
@@ -1704,16 +1731,24 @@ document.getElementById('cb-tw-refresh').addEventListener('click', async () => {
   btn.disabled    = true;
   btn.textContent = '更新中…';
 
+  let authErr = null;
   await Promise.all(cbFavorites.twitch.map(async (ch, i) => {
-    const url = await cbFetchTwitchThumbnail(ch.username);
-    if (url) cbFavorites.twitch[i].thumbnailUrl = url;
+    try {
+      const url = await cbFetchTwitchThumbnail(ch.username);
+      if (url) cbFavorites.twitch[i].thumbnailUrl = url;
+    } catch (err) {
+      authErr = authErr ?? err;
+    }
   }));
 
   cbSave();
   cbRenderTwList();
   btn.disabled    = false;
   btn.textContent = 'アイコン更新';
-  cbSetStatus('Twitch アイコンを更新しました', 'ok');
+  cbSetStatus(
+    authErr ? cbTwitchErrorMessage(authErr, 'アイコン更新に失敗しました') : 'Twitch アイコンを更新しました',
+    authErr ? 'error' : 'ok'
+  );
 });
 
 // YouTube リスト: 並び替え・削除・パネル展開（イベント委任）
