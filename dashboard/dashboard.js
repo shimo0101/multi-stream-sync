@@ -240,7 +240,7 @@ class PanelController {
     }
   }
 
-  load(rawUrl) {
+  async load(rawUrl) {
     const detected = detectPlatform(rawUrl);
     if (detected && detected !== this.platform) {
       this.setPlatform(detected);
@@ -256,7 +256,7 @@ class PanelController {
       document.getElementById(`btn-chat-${this.idx}`).disabled = true;
       this.loadedId  = videoId;
       this.resumeKey = `youtube:${videoId}`;
-      const savedPos = getPlaybackPosition(this.resumeKey);
+      const savedPos = await cbResolveResumePosition('youtube', videoId, getPlaybackPosition(this.resumeKey));
       player.load(videoId, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
       setStatus(savedPos
@@ -276,7 +276,7 @@ class PanelController {
       this.loadedId  = parsed.type === 'channel' ? parsed.id : null;
       // レジューム対象はVOD（録画）のみ。ライブチャンネルには resumeKey を設定しない
       this.resumeKey = parsed.type === 'video' ? `twitch:${parsed.id}` : null;
-      const savedPos = getPlaybackPosition(this.resumeKey);
+      const savedPos = await cbResolveResumePosition('twitch', parsed.id, getPlaybackPosition(this.resumeKey));
       player.load(parsed.id, parsed.type, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
       setStatus(savedPos
@@ -693,6 +693,58 @@ function savePlaybackPosition(key, pos) {
     }
     localStorage.setItem(PLAYBACK_POS_KEY, JSON.stringify(all));
   } catch {}
+}
+
+const RESUME_END_MARGIN = 30; // 動画の残りがこの秒数未満なら「見終わった」とみなしレジュームしない
+
+// "PT1H2M3S" → 3723（YouTubeのISO8601動画長）
+function isoDurationToSeconds(iso) {
+  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || '');
+  if (!m) return null;
+  return (Number(m[1] || 0) * 3600) + (Number(m[2] || 0) * 60) + Number(m[3] || 0);
+}
+
+// "1h2m3s" → 3723（TwitchのVOD長。時間・分が無い場合もある）
+function twitchDurationToSeconds(str) {
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(str || '');
+  if (!m || (!m[1] && !m[2] && !m[3])) return null;
+  return (Number(m[1] || 0) * 3600) + (Number(m[2] || 0) * 60) + Number(m[3] || 0);
+}
+
+async function cbFetchYouTubeDuration(videoId) {
+  const apiKey = settings.ytApiKey;
+  if (!apiKey) return null;
+  try {
+    const url = new URL('https://www.googleapis.com/youtube/v3/videos');
+    url.searchParams.set('part', 'contentDetails');
+    url.searchParams.set('id', videoId);
+    url.searchParams.set('key', apiKey);
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return isoDurationToSeconds(data.items?.[0]?.contentDetails?.duration);
+  } catch { return null; }
+}
+
+async function cbFetchTwitchVodDuration(videoId) {
+  const token    = localStorage.getItem('mss-tw-token');
+  const clientId = settings.twClientId;
+  if (!token || !clientId) return null;
+  try {
+    const data = await cbTwitchFetch(`https://api.twitch.tv/helix/videos?id=${encodeURIComponent(videoId)}`, token, clientId);
+    return twitchDurationToSeconds(data.data?.[0]?.duration);
+  } catch { return null; }
+}
+
+// 保存済み再生位置が「動画の終盤（残りがRESUME_END_MARGIN秒未満）」なら見終わった扱いにしてレジュームさせない。
+// 動画の長さが取得できない場合は安全側に倒してそのままレジュームする
+async function cbResolveResumePosition(platform, id, savedPos) {
+  if (!savedPos) return 0;
+  const duration = platform === 'youtube'
+    ? await cbFetchYouTubeDuration(id)
+    : await cbFetchTwitchVodDuration(id);
+  if (duration != null && duration - savedPos < RESUME_END_MARGIN) return 0;
+  return savedPos;
 }
 
 // パネルで再生中の動画（resumeKey が設定されているもの＝ライブ以外）の再生位置を定期的に保存する
