@@ -524,6 +524,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .cb-empty { font-size: 12px; color: #4b5563; padding: 8px 0; }
 
 .cb-item {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -533,6 +534,9 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   padding: 8px 10px;
 }
 .cb-item.is-live { border-color: #dc2626; }
+/* 編集モード時: 削除ボタン(✕)は誤タップ防止のため↑↓から離し、カード右上に単独配置する */
+.cb-item.is-editing { padding-right: 32px; }
+.cb-item-del { position: absolute; top: 6px; right: 6px; }
 
 .cb-avatar {
   width: 36px;

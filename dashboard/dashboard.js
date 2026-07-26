@@ -1139,7 +1139,7 @@ function cbRenderYtList() {
     ? `<li><div class="cb-sort-bar">ライブ順で表示中 <button class="btn-sort-reset" data-reset-yt-sort>↺ 元の順序</button></div></li>`
     : '';
   list.innerHTML = sortBar + view.map((ch, vi) => `
-    <li class="cb-item${ch.liveVideoId ? ' is-live' : ''}">
+    <li class="cb-item${ch.liveVideoId ? ' is-live' : ''}${cbEditMode.youtube ? ' is-editing' : ''}">
       ${ch.thumbnailUrl
         ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
         : `<div class="cb-avatar-initial" style="background:#cc0000">${escHtml(ch.name[0] ?? '?')}</div>`
@@ -1167,9 +1167,9 @@ function cbRenderYtList() {
         <div class="cb-reorder-row">
           <button class="cb-reorder-btn" data-cb-yt-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
           <button class="cb-reorder-btn" data-cb-yt-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
-        </div>` : ''}
-        <button class="cb-del-btn" data-cb-yt-del="${ch.origIdx}">✕</button>` : ''}
+        </div>` : ''}` : ''}
       </div>
+      ${cbEditMode.youtube ? `<button class="cb-del-btn cb-item-del" data-cb-yt-del="${ch.origIdx}">✕</button>` : ''}
     </li>
   `).join('');
 }
@@ -1192,7 +1192,7 @@ function cbRenderTwList() {
     ? `<li><div class="cb-sort-bar">ライブ順で表示中 <button class="btn-sort-reset" data-reset-tw-sort>↺ 元の順序</button></div></li>`
     : '';
   list.innerHTML = sortBar + view.map((ch, vi) => `
-    <li class="cb-item${ch.isLive ? ' is-live' : ''}">
+    <li class="cb-item${ch.isLive ? ' is-live' : ''}${cbEditMode.twitch ? ' is-editing' : ''}">
       ${ch.thumbnailUrl
         ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
         : `<div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>`
@@ -1219,9 +1219,9 @@ function cbRenderTwList() {
         <div class="cb-reorder-row">
           <button class="cb-reorder-btn" data-cb-tw-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
           <button class="cb-reorder-btn" data-cb-tw-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
-        </div>` : ''}
-        <button class="cb-del-btn" data-cb-tw-del="${ch.origIdx}">✕</button>` : ''}
+        </div>` : ''}` : ''}
       </div>
+      ${cbEditMode.twitch ? `<button class="cb-del-btn cb-item-del" data-cb-tw-del="${ch.origIdx}">✕</button>` : ''}
     </li>
   `).join('');
 }
