@@ -110,10 +110,12 @@ function createPanelHTML(idx) {
         </div>
         <button id="btn-nudge-${idx}" class="btn--nudge" title="再生位置を補正（同期のズレをその場で直す）">⏱</button>
         <div class="nudge-bar" id="nudge-bar-${idx}" hidden>
+          <button class="btn--nudge-adj" data-panel="${idx}" data-delta="-30">−30s</button>
           <button class="btn--nudge-adj" data-panel="${idx}" data-delta="-5">−5s</button>
           <button class="btn--nudge-adj" data-panel="${idx}" data-delta="-1">−1s</button>
           <button class="btn--nudge-adj" data-panel="${idx}" data-delta="1">+1s</button>
           <button class="btn--nudge-adj" data-panel="${idx}" data-delta="5">+5s</button>
+          <button class="btn--nudge-adj" data-panel="${idx}" data-delta="30">+30s</button>
         </div>
       </div>
     </section>`;
