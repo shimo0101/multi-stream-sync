@@ -96,6 +96,12 @@ function createPanelHTML(idx) {
         <div class="config-row">
           <button id="btn-chat-${idx}" class="btn btn--chat" disabled>チャット開始</button>
           <span id="chat-hint-${idx}" class="hint"></span>
+          <button id="btn-comments-${idx}" class="btn btn--comments" disabled>💬 コメント</button>
+        </div>
+        <div class="comments-panel" id="comments-panel-${idx}" hidden>
+          <div class="comments-list" id="comments-list-${idx}"></div>
+          <div class="comments-status" id="comments-status-${idx}"></div>
+          <button id="btn-comments-more-${idx}" class="btn btn--secondary" hidden>もっと読み込む</button>
         </div>
       </div>
       <div class="player-wrap">
@@ -130,6 +136,8 @@ class PanelController {
     this.loadedId      = null;
     this.resumeKey     = null; // レジューム再生用キー（'youtube:videoId' / 'twitch:VOD id'。ライブは対象外でnull）
     this.startTimeSecs = null;
+    this.commentsNextToken = null; // YouTubeコメント: 次ページトークン
+    this.commentsLoaded    = false;
     this.overlay       = new CommentOverlay(document.getElementById(`canvas-${idx}`));
 
     this._ytPlayer = null;
@@ -181,6 +189,10 @@ class PanelController {
 
     document.getElementById(`chat-hint-${this.idx}`).textContent =
       platform === 'twitch' ? '匿名接続 · API Key 不要' : '';
+
+    // コメント欄はYouTubeのみ対応（TwitchはVODコメントの公式APIが無いため非対応）
+    document.getElementById(`btn-comments-${this.idx}`).hidden = (platform !== 'youtube');
+    this.resetComments();
 
     document.querySelectorAll(`[data-panel="${this.idx}"] .plat-btn`).forEach(b =>
       b.classList.toggle('active', b.dataset.platform === platform)
@@ -265,6 +277,8 @@ class PanelController {
       document.getElementById(`btn-chat-${this.idx}`).disabled = true;
       this.loadedId  = videoId;
       this.resumeKey = `youtube:${videoId}`;
+      this.resetComments();
+      document.getElementById(`btn-comments-${this.idx}`).disabled = false;
       const savedPos = await cbResolveResumePosition('youtube', videoId, getPlaybackPosition(this.resumeKey));
       player.load(videoId, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
@@ -321,6 +335,49 @@ class PanelController {
     const target = Math.max(0, current + deltaSecs);
     this.player.seekTo(target);
     setStatus(`P${this.idx + 1} を ${deltaSecs > 0 ? '+' : ''}${deltaSecs}s 補正しました（${formatHMS(target)}〜）`, 'ok');
+  }
+
+  // コメント欄をまっさらな状態に戻す（動画切り替え・プラットフォーム切り替え時）
+  resetComments() {
+    this.commentsNextToken = null;
+    this.commentsLoaded    = false;
+    document.getElementById(`comments-panel-${this.idx}`).hidden = true;
+    document.getElementById(`comments-list-${this.idx}`).innerHTML = '';
+    document.getElementById(`comments-status-${this.idx}`).textContent = '';
+    document.getElementById(`btn-comments-more-${this.idx}`).hidden = true;
+    document.getElementById(`btn-comments-${this.idx}`).disabled = true;
+  }
+
+  // YouTube動画の通常コメントを読み込む（reset=falseで次ページを追加読み込み）
+  async loadComments(reset = true) {
+    if (this.platform !== 'youtube' || !this.loadedId) return;
+    if (!settings.ytApiKey) {
+      document.getElementById(`comments-status-${this.idx}`).textContent =
+        'YouTube API Key が未設定です（⚙ 共通設定）';
+      return;
+    }
+
+    const listEl   = document.getElementById(`comments-list-${this.idx}`);
+    const statusEl = document.getElementById(`comments-status-${this.idx}`);
+    const moreBtn  = document.getElementById(`btn-comments-more-${this.idx}`);
+
+    if (reset) {
+      listEl.innerHTML = '';
+      this.commentsNextToken = null;
+    }
+    statusEl.textContent = '読み込み中…';
+    moreBtn.hidden = true;
+
+    try {
+      const data = await fetchYouTubeComments(this.loadedId, settings.ytApiKey, this.commentsNextToken);
+      this.commentsNextToken = data.nextPageToken || null;
+      this.commentsLoaded    = true;
+      renderComments(listEl, data.items ?? [], this.idx);
+      statusEl.textContent = (reset && !(data.items ?? []).length) ? 'コメントはまだありません' : '';
+      moreBtn.hidden = !this.commentsNextToken;
+    } catch (err) {
+      statusEl.textContent = `コメントの取得に失敗しました: ${err.message}`;
+    }
   }
 
   destroy() {
@@ -582,6 +639,31 @@ function bindPanelEvents(idx) {
       if (!panel.loadedId)   { setStatus('先に Twitch チャンネルを読み込んでください', 'error'); return; }
       chat.connect(panel.loadedId);
     }
+  });
+
+  // コメントボタン（YouTubeのみ）
+  document.getElementById(`btn-comments-${idx}`).addEventListener('click', async () => {
+    const commentsPanel = document.getElementById(`comments-panel-${idx}`);
+    const opening = commentsPanel.hidden;
+    commentsPanel.hidden = !opening;
+    if (opening && !panels[idx].commentsLoaded) {
+      await panels[idx].loadComments(true);
+    }
+  });
+
+  document.getElementById(`btn-comments-more-${idx}`).addEventListener('click', () => {
+    panels[idx].loadComments(false);
+  });
+
+  // コメント本文中のタイムスタンプリンクのクリック（イベント委任）
+  document.getElementById(`comments-list-${idx}`).addEventListener('click', (e) => {
+    const link = e.target.closest('.comment-ts');
+    if (!link) return;
+    e.preventDefault();
+    const pi   = Number(link.dataset.panel);
+    const secs = Number(link.dataset.secs);
+    panels[pi].player?.seekTo(secs);
+    setStatus(`P${pi + 1} を ${formatHMS(secs)} にジャンプしました`, 'ok');
   });
 }
 
@@ -1212,6 +1294,82 @@ function escHtml(s) {
   return String(s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
   );
+}
+
+// ===== YouTube 動画コメント =====
+
+function relativeTime(isoStr) {
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60)      return `${diff}秒前`;
+  if (diff < 3600)    return `${Math.floor(diff / 60)}分前`;
+  if (diff < 86400)   return `${Math.floor(diff / 3600)}時間前`;
+  if (diff < 2592000) return `${Math.floor(diff / 86400)}日前`;
+  return `${Math.floor(diff / 2592000)}ヶ月前`;
+}
+
+// "1:23" / "1:02:03" → 秒数。形式が不正なら null
+function parseTimestampToSeconds(str) {
+  const parts = str.split(':').map(Number);
+  if (parts.some(n => !Number.isFinite(n))) return null;
+  if (parts.length === 2) {
+    const [m, s] = parts;
+    if (s >= 60) return null;
+    return m * 60 + s;
+  }
+  if (parts.length === 3) {
+    const [h, m, s] = parts;
+    if (m >= 60 || s >= 60) return null;
+    return h * 3600 + m * 60 + s;
+  }
+  return null;
+}
+
+// コメント本文中の "1:23" のようなタイムスタンプをクリックでシークできるリンクに変換する
+// （YouTube公式サイトが自動リンク化しているのと同じ表記をこちら側でも解釈するだけで、
+//  APIから構造化されたタイムスタンプ情報が来るわけではない）
+function linkifyTimestamps(text, panelIdx) {
+  const escaped = escHtml(text);
+  return escaped.replace(/\b(\d{1,2}(?::\d{2}){1,2})\b/g, (match) => {
+    const secs = parseTimestampToSeconds(match);
+    if (secs == null) return match;
+    return `<a href="#" class="comment-ts" data-panel="${panelIdx}" data-secs="${secs}">${match}</a>`;
+  });
+}
+
+async function fetchYouTubeComments(videoId, apiKey, pageToken) {
+  const url = new URL('https://www.googleapis.com/youtube/v3/commentThreads');
+  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('videoId', videoId);
+  url.searchParams.set('order', 'relevance');
+  url.searchParams.set('maxResults', '20');
+  url.searchParams.set('textFormat', 'plainText');
+  url.searchParams.set('key', apiKey);
+  if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+  const res = await fetch(url);
+  if (res.status === 403) throw new Error('コメントが無効な動画か、APIキーが無効です');
+  if (res.status === 404) throw new Error('動画が見つかりません');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function renderComments(listEl, items, panelIdx) {
+  const html = items.map(item => {
+    const sn = item.snippet.topLevelComment.snippet;
+    const avatar = sn.authorProfileImageUrl
+      ? `<img class="comment-avatar" src="${escHtml(sn.authorProfileImageUrl)}" alt="">`
+      : `<div class="comment-avatar"></div>`;
+    return `
+      <div class="comment-item">
+        ${avatar}
+        <div class="comment-body">
+          <div class="comment-author">${escHtml(sn.authorDisplayName)}</div>
+          <div class="comment-text">${linkifyTimestamps(sn.textOriginal, panelIdx)}</div>
+          <div class="comment-meta">👍 ${sn.likeCount} · ${relativeTime(sn.publishedAt)}</div>
+        </div>
+      </div>`;
+  }).join('');
+  listEl.insertAdjacentHTML('beforeend', html);
 }
 
 // YouTube: @ハンドル or チャンネルID → チャンネル情報を取得

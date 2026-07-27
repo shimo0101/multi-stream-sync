@@ -86,6 +86,36 @@ body {
 .btn--chat.is-live { background: #7f1d1d; color: #fca5a5; border-color: #dc2626; }
 .btn--chat.is-live:hover:not(:disabled) { background: #dc2626; color: #fff; }
 
+.btn--comments { background: #1a1a2e; color: #a78bfa; border: 1px solid #3a3a5a; padding: 5px 12px; }
+.btn--comments:hover:not(:disabled) { background: #2a2a4a; color: #fff; }
+
+/* ===== YouTube 動画コメント欄 ===== */
+.comments-panel {
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid #2a2a3a;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.comment-item { display: flex; gap: 8px; }
+.comment-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  object-fit: cover; background: #2a2a3a;
+}
+.comment-body { min-width: 0; flex: 1; }
+.comment-author { font-size: 12px; font-weight: 700; color: #c4b5fd; }
+.comment-text {
+  font-size: 12px; color: #e0e0e0; line-height: 1.5;
+  white-space: pre-wrap; overflow-wrap: break-word;
+}
+.comment-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.comment-ts { color: #60a5fa; text-decoration: underline; cursor: pointer; }
+.comment-ts:hover { color: #93c5fd; }
+.comments-status { font-size: 12px; color: #6b7280; text-align: center; padding: 4px 0; }
+
 .btn--settings {
   background: #1a1a2a;
   color: #9ca3af;
