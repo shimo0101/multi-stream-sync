@@ -1511,6 +1511,15 @@ function saveStampDictionary(dict) {
   try { localStorage.setItem(STAMP_DICT_KEY, JSON.stringify(dict)); } catch {}
 }
 
+// チャンネル数が上限を超えたら、更新日時(at)が古いものから削除する
+function trimStampDictionary(dict) {
+  const keys = Object.keys(dict);
+  if (keys.length > STAMP_DICT_MAX_CHANNELS) {
+    keys.sort((a, b) => dict[a].at - dict[b].at);
+    for (const k of keys.slice(0, keys.length - STAMP_DICT_MAX_CHANNELS)) delete dict[k];
+  }
+}
+
 // アーカイブ解析で見つかったスタンプ（{url, fallbackText}の配列）を、指定チャンネルの辞書にマージする
 function registerStamps(channelId, stamps) {
   if (!channelId || !stamps?.length) return;
@@ -1522,12 +1531,53 @@ function registerStamps(channelId, stamps) {
   entry.at = Date.now();
   dict[channelId] = entry;
 
-  const keys = Object.keys(dict);
-  if (keys.length > STAMP_DICT_MAX_CHANNELS) {
-    keys.sort((a, b) => dict[a].at - dict[b].at);
-    for (const k of keys.slice(0, keys.length - STAMP_DICT_MAX_CHANNELS)) delete dict[k];
-  }
+  trimStampDictionary(dict);
   saveStampDictionary(dict);
+}
+
+// スタンプ辞書全体をJSONファイルとしてダウンロードする（別端末への共有用）
+function exportStampDictionary() {
+  const json = JSON.stringify(loadStampDictionary(), null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'mss-stamp-dictionary.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// exportStampDictionary()で書き出したJSONファイルを取り込み、既存の辞書にマージする
+// （同じチャンネル・同じshortcutは取り込んだ側で上書き。取り込んだチャンネルはatを現在時刻に更新）
+async function importStampDictionaryFile(file) {
+  let imported;
+  try {
+    imported = JSON.parse(await file.text());
+  } catch {
+    throw new Error('ファイルの形式が正しくありません');
+  }
+  if (typeof imported !== 'object' || imported === null) throw new Error('ファイルの形式が正しくありません');
+
+  const dict = loadStampDictionary();
+  let channelCount = 0;
+  let entryCount   = 0;
+  for (const [channelId, src] of Object.entries(imported)) {
+    if (!src?.entries || typeof src.entries !== 'object') continue;
+    const entry = dict[channelId] ?? { entries: {}, at: 0 };
+    for (const [shortcut, url] of Object.entries(src.entries)) {
+      if (typeof shortcut === 'string' && typeof url === 'string') {
+        entry.entries[shortcut] = url;
+        entryCount++;
+      }
+    }
+    entry.at = Date.now();
+    dict[channelId] = entry;
+    channelCount++;
+  }
+
+  trimStampDictionary(dict);
+  saveStampDictionary(dict);
+  return { channelCount, entryCount };
 }
 
 // テキスト中の ":shortcut:" パターンを、指定チャンネルの辞書と照合してスタンプ画像に置き換える。
@@ -2517,6 +2567,26 @@ function cbImport(b64raw) {
     return added;
   } catch { return -1; }
 }
+
+// スタンプ辞書の書き出し/読み込み（別端末への共有用）
+document.getElementById('btn-stamp-dict-export').addEventListener('click', () => {
+  exportStampDictionary();
+  setStatus('スタンプ辞書を書き出しました', 'ok');
+});
+document.getElementById('btn-stamp-dict-import').addEventListener('click', () => {
+  document.getElementById('stamp-dict-file').click();
+});
+document.getElementById('stamp-dict-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const { channelCount, entryCount } = await importStampDictionaryFile(file);
+    setStatus(`スタンプ辞書を読み込みました（${channelCount}チャンネル・${entryCount}件）`, 'ok');
+  } catch (err) {
+    setStatus(`スタンプ辞書の読み込みに失敗しました: ${err.message}`, 'error');
+  }
+});
 
 // 📤 共有ボタン
 document.getElementById('btn-cb-share').addEventListener('click', () => {

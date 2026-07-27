@@ -173,6 +173,7 @@ body {
   min-width: 0;
 }
 .settings-item .input { flex: 1; min-width: 0; }
+.settings-item-row { display: flex; gap: 8px; flex: 1; min-width: 0; }
 
 .settings-note {
   margin-top: 8px;
