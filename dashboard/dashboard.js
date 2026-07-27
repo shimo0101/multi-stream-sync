@@ -462,8 +462,8 @@ class PanelController {
       const gap = i === 0 ? 0 : Math.min(4000, Math.max(0, item.offsetMs - newItems[i - 1].offsetMs));
       cumulativeDelay += gap;
       const timerId = setTimeout(() => {
-        const prefix = item.author ? `${item.author}: ` : '';
-        this.overlay.addComment(prefix + item.text, { color: item.color, avatarUrl: item.avatarUrl });
+        // 既存のライブチャット表示と同様、ユーザー名は表示せず本文のみを流す
+        this.overlay.addComment(item.text, { color: item.color, avatarUrl: item.avatarUrl });
       }, cumulativeDelay);
       this.chatReplayTimers.push(timerId);
     });
