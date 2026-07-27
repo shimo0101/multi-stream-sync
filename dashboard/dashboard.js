@@ -99,6 +99,10 @@ function createPanelHTML(idx) {
           <button id="btn-comments-${idx}" class="btn btn--comments" disabled>💬 コメント</button>
         </div>
         <div class="comments-panel" id="comments-panel-${idx}" hidden>
+          <div class="comments-panel-header">
+            <span class="comments-panel-title">💬 コメント</span>
+            <button id="btn-comments-close-${idx}" class="btn-comments-close" title="コメントを閉じる">✕</button>
+          </div>
           <div class="comments-list" id="comments-list-${idx}"></div>
           <div class="comments-status" id="comments-status-${idx}"></div>
           <button id="btn-comments-more-${idx}" class="btn btn--secondary" hidden>もっと読み込む</button>
@@ -346,6 +350,7 @@ class PanelController {
     document.getElementById(`comments-status-${this.idx}`).textContent = '';
     document.getElementById(`btn-comments-more-${this.idx}`).hidden = true;
     document.getElementById(`btn-comments-${this.idx}`).disabled = true;
+    document.getElementById(`btn-comments-${this.idx}`).classList.remove('is-active');
   }
 
   // YouTube動画の通常コメントを読み込む（reset=falseで次ページを追加読み込み）
@@ -642,13 +647,21 @@ function bindPanelEvents(idx) {
   });
 
   // コメントボタン（YouTubeのみ）
+  function setCommentsOpen(open) {
+    document.getElementById(`comments-panel-${idx}`).hidden = !open;
+    document.getElementById(`btn-comments-${idx}`).classList.toggle('is-active', open);
+  }
+
   document.getElementById(`btn-comments-${idx}`).addEventListener('click', async () => {
-    const commentsPanel = document.getElementById(`comments-panel-${idx}`);
-    const opening = commentsPanel.hidden;
-    commentsPanel.hidden = !opening;
+    const opening = document.getElementById(`comments-panel-${idx}`).hidden;
+    setCommentsOpen(opening);
     if (opening && !panels[idx].commentsLoaded) {
       await panels[idx].loadComments(true);
     }
+  });
+
+  document.getElementById(`btn-comments-close-${idx}`).addEventListener('click', () => {
+    setCommentsOpen(false);
   });
 
   document.getElementById(`btn-comments-more-${idx}`).addEventListener('click', () => {

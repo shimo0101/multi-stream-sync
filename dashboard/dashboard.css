@@ -88,14 +88,38 @@ body {
 
 .btn--comments { background: #1a1a2e; color: #a78bfa; border: 1px solid #3a3a5a; padding: 5px 12px; }
 .btn--comments:hover:not(:disabled) { background: #2a2a4a; color: #fff; }
+.btn--comments.is-active { background: #2a1a4a; border-color: #7c3aed; color: #fff; }
 
 /* ===== YouTube 動画コメント欄 ===== */
 .comments-panel {
-  max-height: 260px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   border-top: 1px solid #2a2a3a;
   padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.comments-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.comments-panel-title { font-size: 12px; font-weight: 700; color: #a78bfa; }
+.btn-comments-close {
+  padding: 2px 8px;
+  font-size: 12px;
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+.btn-comments-close:hover { color: #f87171; border-color: #dc2626; }
+
+.comments-list {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 10px;
