@@ -1309,7 +1309,9 @@ async function cbFetchLiveStatusBatch(videoIds) {
       const data = await cbFetchJsonWithRetry(url);
       for (const item of data?.items ?? []) {
         const live = item.liveStreamingDetails;
-        result[item.id] = { isLive: !!(live && !live.actualEndTime), title: item.snippet.title };
+        // actualStartTime が無い（＝待機枠・配信予定でまだ始まっていない）場合はライブ扱いしない
+        const isLive = !!(live && live.actualStartTime && !live.actualEndTime);
+        result[item.id] = { isLive, title: item.snippet.title };
       }
     } catch {}
   }

@@ -1279,7 +1279,8 @@
       const live        = v.liveStreamingDetails;
       const durationSec = isoDurationToSeconds(v.contentDetails?.duration);
       const isArchive   = !!(live && live.actualEndTime);
-      const isLive      = !!(live && !live.actualEndTime);
+      // actualStartTime が無い（＝待機枠・配信予定でまだ始まっていない）場合はライブ扱いしない
+      const isLive      = !!(live && live.actualStartTime && !live.actualEndTime);
       const isShort     = !live && durationSec > 0 && durationSec <= 60;
       const isVideo     = !live && !isShort;
       return {
