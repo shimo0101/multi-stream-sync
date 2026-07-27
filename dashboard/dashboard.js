@@ -1587,7 +1587,9 @@ function applyKnownStamps(text, channelId) {
   const entries = loadStampDictionary()[channelId]?.entries;
   if (!entries) return { text, stamps: [] };
 
-  const re = /:[A-Za-z0-9_+-]+:/g;
+  // ショートカット名は日本語等の非ASCII文字を含むことがあるため、コロンで挟まれた
+  // 空白・コロン以外の文字列を広く許容する（辞書に無いものはこの後のlookupで自然に弾かれる）
+  const re = /:[^\s:]+:/g;
   let result    = '';
   let lastIndex = 0;
   const stamps  = [];
