@@ -1485,13 +1485,10 @@ function renderComments(listEl, items, panelIdx) {
 
 // ===== yt-dlp live_chat.json（アーカイブ視聴用チャットリプレイ）=====
 
-// message.runs（テキスト・絵文字が混在する配列）を1つのプレーンテキストに変換
+// message.runs（テキスト・絵文字が混在する配列）を1つのプレーンテキストに変換。
+// 絵文字・スタンプは表示せず、テキスト部分のみを残す
 function joinLiveChatRuns(runs) {
-  return (runs ?? []).map(r => {
-    if (typeof r.text === 'string') return r.text;
-    if (r.emoji) return r.emoji.shortcuts?.[0] ?? r.emoji.emojiId ?? '';
-    return '';
-  }).join('');
+  return (runs ?? []).map(r => (typeof r.text === 'string' ? r.text : '')).join('');
 }
 
 // yt-dlp `--write-subs --sub-langs live_chat` で取得した .live_chat.json（JSON Lines形式）を解析する。
@@ -1522,11 +1519,14 @@ function parseLiveChatJsonl(text) {
       const text_     = joinLiveChatRuns(renderer.message?.runs);
       const amount    = isPaid ? (renderer.purchaseAmountText?.simpleText ?? '') : '';
       const avatarUrl = renderer.authorPhoto?.thumbnails?.[0]?.url ?? null;
+      const displayText = amount ? `[${amount}] ${text_}` : text_;
+
+      if (!displayText.trim()) continue; // 本文がスタンプのみ等で空になった場合は表示しない
 
       items.push({
         offsetMs,
         author,
-        text: amount ? `[${amount}] ${text_}` : text_,
+        text: displayText,
         color: isPaid ? 'rgba(250,204,21,0.95)' : 'rgba(255,255,255,0.85)',
         avatarUrl,
       });
