@@ -38,7 +38,7 @@ export class CommentOverlay {
     return Math.max(14, Math.min(22, this.#laneHeight - 6));
   }
 
-  /** 画像をキャッシュつきで非同期ロード。未ロード時は null を返す。 */
+  /** 画像をキャッシュつきで非同期ロード。未ロード・失敗時は null を返す。 */
   #getImage(url) {
     if (this.#imageCache.has(url)) return this.#imageCache.get(url);
     this.#imageCache.set(url, null);
@@ -81,12 +81,13 @@ export class CommentOverlay {
   /**
    * コメントをキューに追加する。
    * @param {string} text
-   * @param {{ color?: string, lane?: number, avatarUrl?: string|null }} opts
+   * @param {{ color?: string, lane?: number, avatarUrl?: string|null, stamps?: Array<{url: string, fallbackText?: string}> }} opts
    */
-  addComment(text, { color = 'rgba(255,255,255,0.82)', lane = null, avatarUrl = null } = {}) {
+  addComment(text, { color = 'rgba(255,255,255,0.82)', lane = null, avatarUrl = null, stamps = [] } = {}) {
     if (this.#canvas.width === 0 || this.#canvas.height === 0) this.#syncSize();
     if (this.#canvas.width === 0) return;
     if (avatarUrl) this.#getImage(avatarUrl); // 先行ロード
+    for (const s of stamps) this.#getImage(s.url); // スタンプ画像も先行ロード
 
     const chosenLane = lane ?? this.#pickLane();
     const comment = {
@@ -96,6 +97,7 @@ export class CommentOverlay {
       x: this.#canvas.width,
       textWidth: null,
       avatarUrl,
+      stamps,
     };
     this.#comments.push(comment);
     this.#lastInLane[chosenLane] = comment;
@@ -127,20 +129,31 @@ export class CommentOverlay {
 
     const fs = this.#fontSize;
     const lh = this.#laneHeight;
-    const av = fs; // アバターサイズ（フォントと同じ高さ）
-    const ag = 4;  // アバターとテキストの隙間
+    const av = fs; // アバター・スタンプのサイズ（フォントと同じ高さ）
+    const ag = 4;  // 要素間の隙間
 
     ctx.font = `bold ${fs}px 'Meiryo','Hiragino Kaku Gothic Pro',sans-serif`;
     ctx.textBaseline = 'top';
 
     for (const c of this.#comments) {
-      const y     = c.lane * lh + Math.floor((lh - fs) / 2);
-      const textX = c.avatarUrl ? c.x + av + ag : c.x;
+      const y = c.lane * lh + Math.floor((lh - fs) / 2);
+
+      // スタンプ各項目の描画用データ（画像が読めていればアイコン、まだ/失敗ならフォールバックテキスト）を用意
+      const stampParts = c.stamps.map((s) => {
+        const img = this.#getImage(s.url);
+        if (img) return { img, width: av };
+        const fallback = s.fallbackText ?? '';
+        return { img: null, text: fallback, width: fallback ? ctx.measureText(fallback).width : 0 };
+      });
 
       if (c.textWidth == null) {
-        c.textWidth = ctx.measureText(c.text).width
-                    + (c.avatarUrl ? av + ag : 0);
+        const avatarPart = c.avatarUrl ? av + ag : 0;
+        const textPart   = ctx.measureText(c.text).width;
+        const stampsPart = stampParts.reduce((sum, p) => sum + p.width + ag, 0);
+        c.textWidth = avatarPart + textPart + stampsPart;
       }
+
+      let drawX = c.avatarUrl ? c.x + av + ag : c.x;
 
       // 丸アバター
       if (c.avatarUrl) {
@@ -155,14 +168,33 @@ export class CommentOverlay {
         }
       }
 
-      // 縁取りで可読性を確保
-      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-      ctx.lineWidth   = 3;
-      ctx.lineJoin    = 'round';
-      ctx.strokeText(c.text, textX, y);
+      // 本文（縁取りで可読性を確保）
+      if (c.text) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.lineWidth   = 3;
+        ctx.lineJoin    = 'round';
+        ctx.strokeText(c.text, drawX, y);
 
-      ctx.fillStyle = c.color;
-      ctx.fillText(c.text, textX, y);
+        ctx.fillStyle = c.color;
+        ctx.fillText(c.text, drawX, y);
+        drawX += ctx.measureText(c.text).width;
+      }
+
+      // スタンプ（画像が読み込めていれば正方形アイコン、失敗時はテキストにフォールバック）
+      for (const part of stampParts) {
+        drawX += ag;
+        if (part.img) {
+          ctx.drawImage(part.img, drawX, y, av, av);
+        } else if (part.text) {
+          ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+          ctx.lineWidth   = 3;
+          ctx.lineJoin    = 'round';
+          ctx.strokeText(part.text, drawX, y);
+          ctx.fillStyle = c.color;
+          ctx.fillText(part.text, drawX, y);
+        }
+        drawX += part.width;
+      }
     }
   }
 

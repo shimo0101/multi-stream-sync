@@ -1,6 +1,6 @@
 import { YouTubePlayer }              from '../scripts/youtube-player.js';
 import { TwitchPlayer }               from '../scripts/twitch-player.js';
-import { CommentOverlay }             from '../scripts/comment-overlay.js';
+import { CommentOverlay }             from '../scripts/comment-overlay.js?v=47';
 import { SyncManager }                from '../scripts/sync-manager.js';
 import { YouTubeChatClient }          from '../scripts/youtube-chat.js';
 import { TwitchChatClient }           from '../scripts/twitch-chat.js';
@@ -463,7 +463,7 @@ class PanelController {
       cumulativeDelay += gap;
       const timerId = setTimeout(() => {
         // 既存のライブチャット表示と同様、ユーザー名は表示せず本文のみを流す
-        this.overlay.addComment(item.text, { color: item.color, avatarUrl: item.avatarUrl });
+        this.overlay.addComment(item.text, { color: item.color, avatarUrl: item.avatarUrl, stamps: item.stamps });
       }, cumulativeDelay);
       this.chatReplayTimers.push(timerId);
     });
@@ -1485,10 +1485,25 @@ function renderComments(listEl, items, panelIdx) {
 
 // ===== yt-dlp live_chat.json（アーカイブ視聴用チャットリプレイ）=====
 
-// message.runs（テキスト・絵文字が混在する配列）を1つのプレーンテキストに変換。
-// 絵文字・スタンプは表示せず、テキスト部分のみを残す
-function joinLiveChatRuns(runs) {
-  return (runs ?? []).map(r => (typeof r.text === 'string' ? r.text : '')).join('');
+// message.runs（テキスト・絵文字/スタンプが混在する配列）からテキストとスタンプ画像情報を抽出する。
+// 投稿者（配信チャンネル）ごとに固有のスタンプ画像URLはrun自体に含まれているため、
+// 手動でチャンネルごとに登録する必要はない。画像URLが取れない絵文字はテキストにフォールバックする
+function extractLiveChatMessage(runs) {
+  let text = '';
+  const stamps = [];
+  for (const r of runs ?? []) {
+    if (typeof r.text === 'string') {
+      text += r.text;
+      continue;
+    }
+    if (r.emoji) {
+      const url      = r.emoji.image?.thumbnails?.[0]?.url ?? null;
+      const shortcut = r.emoji.shortcuts?.[0] ?? r.emoji.emojiId ?? '';
+      if (url) stamps.push({ url, fallbackText: shortcut });
+      else if (shortcut) text += shortcut;
+    }
+  }
+  return { text, stamps };
 }
 
 // yt-dlp `--write-subs --sub-langs live_chat` で取得した .live_chat.json（JSON Lines形式）を解析する。
@@ -1516,17 +1531,18 @@ function parseLiveChatJsonl(text) {
       if (!renderer) continue; // メンバー入会等の非テキストイベントは対象外
 
       const author    = renderer.authorName?.simpleText ?? '';
-      const text_     = joinLiveChatRuns(renderer.message?.runs);
+      const { text: text_, stamps } = extractLiveChatMessage(renderer.message?.runs);
       const amount    = isPaid ? (renderer.purchaseAmountText?.simpleText ?? '') : '';
       const avatarUrl = renderer.authorPhoto?.thumbnails?.[0]?.url ?? null;
       const displayText = amount ? `[${amount}] ${text_}` : text_;
 
-      if (!displayText.trim()) continue; // 本文がスタンプのみ等で空になった場合は表示しない
+      if (!displayText.trim() && !stamps.length) continue; // 本文・スタンプとも無ければ表示しない
 
       items.push({
         offsetMs,
         author,
         text: displayText,
+        stamps,
         color: isPaid ? 'rgba(250,204,21,0.95)' : 'rgba(255,255,255,0.85)',
         avatarUrl,
       });
