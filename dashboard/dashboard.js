@@ -97,6 +97,9 @@ function createPanelHTML(idx) {
           <button id="btn-chat-${idx}" class="btn btn--chat" disabled>チャット開始</button>
           <span id="chat-hint-${idx}" class="hint"></span>
           <button id="btn-comments-${idx}" class="btn btn--comments" disabled>💬 コメント</button>
+          <button id="btn-chat-replay-${idx}" class="btn btn--secondary" disabled
+                  title="yt-dlpで取得したlive_chat.jsonを読み込み、アーカイブ再生に同期してチャットを再現する">📄 チャット読込</button>
+          <input type="file" id="chat-replay-file-${idx}" accept=".json,application/json" hidden>
         </div>
         <div class="comments-panel" id="comments-panel-${idx}" hidden>
           <div class="comments-panel-header">
@@ -142,6 +145,9 @@ class PanelController {
     this.startTimeSecs = null;
     this.commentsNextToken = null; // YouTubeコメント: 次ページトークン
     this.commentsLoaded    = false;
+    this.chatReplayItems  = []; // yt-dlpのlive_chat.jsonから読み込んだ{offsetMs, author, text, color, avatarUrl}の配列（offsetMs昇順）
+    this.chatReplayIdx    = 0;  // 次に表示すべき chatReplayItems のインデックス
+    this.chatReplayTimers = []; // 表示ずらし用の保留中setTimeout ID
     this.overlay       = new CommentOverlay(document.getElementById(`canvas-${idx}`));
 
     this._ytPlayer = null;
@@ -197,6 +203,10 @@ class PanelController {
     // コメント欄はYouTubeのみ対応（TwitchはVODコメントの公式APIが無いため非対応）
     document.getElementById(`btn-comments-${this.idx}`).hidden = (platform !== 'youtube');
     this.resetComments();
+
+    // チャットJSON読込（yt-dlp連携）もYouTubeのみ対応
+    document.getElementById(`btn-chat-replay-${this.idx}`).hidden = (platform !== 'youtube');
+    this.resetChatReplay();
 
     document.querySelectorAll(`[data-panel="${this.idx}"] .plat-btn`).forEach(b =>
       b.classList.toggle('active', b.dataset.platform === platform)
@@ -283,6 +293,8 @@ class PanelController {
       this.resumeKey = `youtube:${videoId}`;
       this.resetComments();
       document.getElementById(`btn-comments-${this.idx}`).disabled = false;
+      this.resetChatReplay();
+      document.getElementById(`btn-chat-replay-${this.idx}`).disabled = false;
       const savedPos = await cbResolveResumePosition('youtube', videoId, getPlaybackPosition(this.resumeKey));
       player.load(videoId, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
@@ -383,6 +395,78 @@ class PanelController {
     } catch (err) {
       statusEl.textContent = `コメントの取得に失敗しました: ${err.message}`;
     }
+  }
+
+  // チャットJSON読込（yt-dlp連携）の状態をまっさらに戻す
+  resetChatReplay() {
+    this.clearChatReplayTimers();
+    this.chatReplayItems = [];
+    this.chatReplayIdx   = 0;
+    document.getElementById(`btn-chat-replay-${this.idx}`).disabled = true;
+    document.getElementById(`chat-replay-file-${this.idx}`).value   = '';
+  }
+
+  clearChatReplayTimers() {
+    for (const id of this.chatReplayTimers) clearTimeout(id);
+    this.chatReplayTimers = [];
+  }
+
+  // yt-dlp --write-subs --sub-langs live_chat で取得した .live_chat.json (JSON Lines) を読み込む
+  async loadChatReplayFile(file) {
+    let text;
+    try {
+      text = await file.text();
+    } catch (err) {
+      setStatus(`P${this.idx + 1}: ファイルの読み込みに失敗しました: ${err.message}`, 'error');
+      return;
+    }
+
+    const items = parseLiveChatJsonl(text);
+    if (!items.length) {
+      setStatus(`P${this.idx + 1}: チャットデータが見つかりませんでした（ファイル形式を確認してください）`, 'error');
+      return;
+    }
+
+    this.clearChatReplayTimers();
+    this.chatReplayItems = items;
+    this.chatReplayIdx   = 0;
+    setStatus(`P${this.idx + 1}: ${items.length}件のチャットを読み込みました`, 'ok');
+  }
+
+  // 現在の再生位置に応じて、表示すべきチャットリプレイ項目をオーバーレイに追加する
+  tickChatReplay() {
+    if (!this.chatReplayItems.length) return;
+    const t = this.player?.getCurrentTime?.();
+    if (t == null) return;
+    const nowMs = t * 1000;
+
+    // 現在時刻までに表示されているべき件数を求める（巻き戻りにも対応するため毎回計算し直す）
+    let correctIdx = 0;
+    while (correctIdx < this.chatReplayItems.length && this.chatReplayItems[correctIdx].offsetMs <= nowMs) correctIdx++;
+
+    if (correctIdx < this.chatReplayIdx) {
+      // 巻き戻された（シークで過去に戻った）: 未来分は取り消し、無言でポインタだけ戻す
+      this.clearChatReplayTimers();
+      this.chatReplayIdx = correctIdx;
+      return;
+    }
+    if (correctIdx === this.chatReplayIdx) return;
+
+    // 新たに追いついた分を表示。間隔が空きすぎている場合は最大4秒までのずらし表示にする
+    // （ライブチャットのバースト表示解消と同じ考え方）
+    const newItems = this.chatReplayItems.slice(this.chatReplayIdx, correctIdx);
+    this.chatReplayIdx = correctIdx;
+
+    let cumulativeDelay = 0;
+    newItems.forEach((item, i) => {
+      const gap = i === 0 ? 0 : Math.min(4000, Math.max(0, item.offsetMs - newItems[i - 1].offsetMs));
+      cumulativeDelay += gap;
+      const timerId = setTimeout(() => {
+        const prefix = item.author ? `${item.author}: ` : '';
+        this.overlay.addComment(prefix + item.text, { color: item.color, avatarUrl: item.avatarUrl });
+      }, cumulativeDelay);
+      this.chatReplayTimers.push(timerId);
+    });
   }
 
   destroy() {
@@ -678,6 +762,15 @@ function bindPanelEvents(idx) {
     panels[pi].player?.seekTo(secs);
     setStatus(`P${pi + 1} を ${formatHMS(secs)} にジャンプしました`, 'ok');
   });
+
+  // チャットJSON読込（yt-dlp連携）ボタン → 隠しファイル入力をトリガー
+  document.getElementById(`btn-chat-replay-${idx}`).addEventListener('click', () => {
+    document.getElementById(`chat-replay-file-${idx}`).click();
+  });
+  document.getElementById(`chat-replay-file-${idx}`).addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) panels[idx].loadChatReplayFile(file);
+  });
 }
 
 // ===== ドラッグ並び替え =====
@@ -907,6 +1000,11 @@ setInterval(() => {
     if (typeof t === 'number' && t > 0) savePlaybackPosition(p.resumeKey, t);
   }
 }, PLAYBACK_POLL_MS);
+
+// チャットJSON読込（yt-dlp連携）: 再生位置に応じて表示すべきチャットを追加していく
+setInterval(() => {
+  for (const p of panels) p.tickChatReplay();
+}, 1000);
 
 // ===== YouTube 配信開始時刻の自動取得 =====
 
@@ -1383,6 +1481,59 @@ function renderComments(listEl, items, panelIdx) {
       </div>`;
   }).join('');
   listEl.insertAdjacentHTML('beforeend', html);
+}
+
+// ===== yt-dlp live_chat.json（アーカイブ視聴用チャットリプレイ）=====
+
+// message.runs（テキスト・絵文字が混在する配列）を1つのプレーンテキストに変換
+function joinLiveChatRuns(runs) {
+  return (runs ?? []).map(r => {
+    if (typeof r.text === 'string') return r.text;
+    if (r.emoji) return r.emoji.shortcuts?.[0] ?? r.emoji.emojiId ?? '';
+    return '';
+  }).join('');
+}
+
+// yt-dlp `--write-subs --sub-langs live_chat` で取得した .live_chat.json（JSON Lines形式）を解析する。
+// 1行 = 1つの replayChatItemAction。videoOffsetTimeMsec が動画内の経過時間（ミリ秒）。
+function parseLiveChatJsonl(text) {
+  const items = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    let obj;
+    try { obj = JSON.parse(trimmed); } catch { continue; }
+
+    const rca = obj.replayChatItemAction;
+    if (!rca) continue;
+    const offsetMs = Number(rca.videoOffsetTimeMsec);
+    if (!Number.isFinite(offsetMs)) continue;
+
+    for (const action of rca.actions ?? []) {
+      const item = action.addChatItemAction?.item;
+      if (!item) continue;
+
+      const isPaid   = !!item.liveChatPaidMessageRenderer;
+      const renderer = item.liveChatTextMessageRenderer ?? item.liveChatPaidMessageRenderer;
+      if (!renderer) continue; // メンバー入会等の非テキストイベントは対象外
+
+      const author    = renderer.authorName?.simpleText ?? '';
+      const text_     = joinLiveChatRuns(renderer.message?.runs);
+      const amount    = isPaid ? (renderer.purchaseAmountText?.simpleText ?? '') : '';
+      const avatarUrl = renderer.authorPhoto?.thumbnails?.[0]?.url ?? null;
+
+      items.push({
+        offsetMs,
+        author,
+        text: amount ? `[${amount}] ${text_}` : text_,
+        color: isPaid ? 'rgba(250,204,21,0.95)' : 'rgba(255,255,255,0.85)',
+        avatarUrl,
+      });
+    }
+  }
+  items.sort((a, b) => a.offsetMs - b.offsetMs);
+  return items;
 }
 
 // YouTube: @ハンドル or チャンネルID → チャンネル情報を取得
