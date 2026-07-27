@@ -148,6 +148,7 @@ class PanelController {
     this.chatReplayItems  = []; // yt-dlpのlive_chat.jsonから読み込んだ{offsetMs, author, text, color, avatarUrl}の配列（offsetMs昇順）
     this.chatReplayIdx    = 0;  // 次に表示すべき chatReplayItems のインデックス
     this.chatReplayTimers = []; // 表示ずらし用の保留中setTimeout ID
+    this.liveChatChannelId = null; // ライブチャット表示中の動画の投稿チャンネルID（スタンプ辞書の照合に使用）
     this.overlay       = new CommentOverlay(document.getElementById(`canvas-${idx}`));
 
     this._ytPlayer = null;
@@ -207,6 +208,7 @@ class PanelController {
     // チャットJSON読込（yt-dlp連携）もYouTubeのみ対応
     document.getElementById(`btn-chat-replay-${this.idx}`).hidden = (platform !== 'youtube');
     this.resetChatReplay();
+    this.liveChatChannelId = null;
 
     document.querySelectorAll(`[data-panel="${this.idx}"] .plat-btn`).forEach(b =>
       b.classList.toggle('active', b.dataset.platform === platform)
@@ -250,7 +252,9 @@ class PanelController {
                         : isModerator ? 'rgba(96,165,250,0.92)'
                         : isMember    ? 'rgba(110,231,183,0.92)'
                         : 'rgba(255,255,255,0.82)';
-            this.overlay.addComment(text, { color, avatarUrl: avatarUrl ?? null });
+            // アーカイブ解析で記録済みのスタンプがあれば、テキスト中の:shortcut:を画像に置き換える
+            const { text: displayText, stamps } = applyKnownStamps(text, this.liveChatChannelId);
+            this.overlay.addComment(displayText, { color, avatarUrl: avatarUrl ?? null, stamps });
           },
           onError:        (msg) => setStatus(`P${this.idx + 1} YouTube チャットエラー: ${msg}`, 'error'),
           onStatusChange: (s)   => updateChatBtn(this.idx, s, 'YouTube'),
@@ -295,6 +299,7 @@ class PanelController {
       document.getElementById(`btn-comments-${this.idx}`).disabled = false;
       this.resetChatReplay();
       document.getElementById(`btn-chat-replay-${this.idx}`).disabled = false;
+      this.liveChatChannelId = null; // 動画が変わったので古いチャンネルIDは無効化（ライブチャット開始時に再解決する）
       const savedPos = await cbResolveResumePosition('youtube', videoId, getPlaybackPosition(this.resumeKey));
       player.load(videoId, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
@@ -431,6 +436,14 @@ class PanelController {
     this.chatReplayItems = items;
     this.chatReplayIdx   = 0;
     setStatus(`P${this.idx + 1}: ${items.length}件のチャットを読み込みました`, 'ok');
+
+    // お気に入り登録済みチャンネルの配信であれば、見つかったスタンプを辞書に記録し
+    // 次回以降のライブチャットでも画像表示できるようにする
+    const channelId = await resolveChannelIdForVideo(this.loadedId);
+    if (channelId && cbFavorites.youtube.some(ch => ch.channelId === channelId)) {
+      const allStamps = items.flatMap(it => it.stamps ?? []);
+      registerStamps(channelId, allStamps);
+    }
   }
 
   // 現在の再生位置に応じて、表示すべきチャットリプレイ項目をオーバーレイに追加する
@@ -722,6 +735,8 @@ function bindPanelEvents(idx) {
       if (chat.isRunning()) { chat.stop(); return; }
       if (!panel.loadedId) { setStatus('先に YouTube 動画を読み込んでください', 'error'); return; }
       chat.updateApiKey(document.getElementById('yt-api-key').value.trim());
+      // スタンプ辞書の照合用にチャンネルIDを解決する（非同期・チャット開始をブロックしない）
+      resolveChannelIdForVideo(panel.loadedId).then(id => { panel.liveChatChannelId = id; });
       chat.start(panel.loadedId);
     } else {
       if (chat.isConnected()) { chat.disconnect(); return; }
@@ -1481,6 +1496,83 @@ function renderComments(listEl, items, panelIdx) {
       </div>`;
   }).join('');
   listEl.insertAdjacentHTML('beforeend', html);
+}
+
+// ===== スタンプ辞書（アーカイブ解析で覚えたスタンプをライブチャットでも使う） =====
+
+const STAMP_DICT_KEY        = 'mss-stamp-dictionary';
+const STAMP_DICT_MAX_CHANNELS = 50; // 辞書に保持するチャンネル数の上限（超えたら古い順に削除）
+
+function loadStampDictionary() {
+  try { return JSON.parse(localStorage.getItem(STAMP_DICT_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveStampDictionary(dict) {
+  try { localStorage.setItem(STAMP_DICT_KEY, JSON.stringify(dict)); } catch {}
+}
+
+// アーカイブ解析で見つかったスタンプ（{url, fallbackText}の配列）を、指定チャンネルの辞書にマージする
+function registerStamps(channelId, stamps) {
+  if (!channelId || !stamps?.length) return;
+  const dict  = loadStampDictionary();
+  const entry = dict[channelId] ?? { entries: {}, at: 0 };
+  for (const s of stamps) {
+    if (s.fallbackText && s.url) entry.entries[s.fallbackText] = s.url;
+  }
+  entry.at = Date.now();
+  dict[channelId] = entry;
+
+  const keys = Object.keys(dict);
+  if (keys.length > STAMP_DICT_MAX_CHANNELS) {
+    keys.sort((a, b) => dict[a].at - dict[b].at);
+    for (const k of keys.slice(0, keys.length - STAMP_DICT_MAX_CHANNELS)) delete dict[k];
+  }
+  saveStampDictionary(dict);
+}
+
+// テキスト中の ":shortcut:" パターンを、指定チャンネルの辞書と照合してスタンプ画像に置き換える。
+// 該当が無ければテキストのまま（従来通り）
+function applyKnownStamps(text, channelId) {
+  if (!channelId || !text) return { text, stamps: [] };
+  const entries = loadStampDictionary()[channelId]?.entries;
+  if (!entries) return { text, stamps: [] };
+
+  const re = /:[A-Za-z0-9_+-]+:/g;
+  let result    = '';
+  let lastIndex = 0;
+  const stamps  = [];
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const url = entries[match[0]];
+    if (url) {
+      result += text.slice(lastIndex, match.index);
+      stamps.push({ url, fallbackText: match[0] });
+      lastIndex = re.lastIndex;
+    }
+  }
+  result += text.slice(lastIndex);
+  return { text: result, stamps };
+}
+
+// 動画IDから投稿チャンネルIDを解決する（セッション内キャッシュあり）
+const _channelIdCache = new Map(); // videoId -> channelId|null
+async function resolveChannelIdForVideo(videoId) {
+  if (_channelIdCache.has(videoId)) return _channelIdCache.get(videoId);
+  if (!settings.ytApiKey) return null;
+  try {
+    const url = new URL('https://www.googleapis.com/youtube/v3/videos');
+    url.searchParams.set('part', 'snippet');
+    url.searchParams.set('id', videoId);
+    url.searchParams.set('key', settings.ytApiKey);
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const channelId = data.items?.[0]?.snippet?.channelId ?? null;
+    _channelIdCache.set(videoId, channelId);
+    return channelId;
+  } catch {
+    return null;
+  }
 }
 
 // ===== yt-dlp live_chat.json（アーカイブ視聴用チャットリプレイ）=====
