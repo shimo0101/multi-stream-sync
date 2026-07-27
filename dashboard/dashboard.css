@@ -91,6 +91,7 @@ body {
 .btn--comments.is-active { background: #2a1a4a; border-color: #7c3aed; color: #fff; }
 
 /* ===== YouTube 動画コメント欄 ===== */
+.comments-panel[hidden] { display: none; }
 .comments-panel {
   border-top: 1px solid #2a2a3a;
   padding: 8px 10px;
