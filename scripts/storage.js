@@ -23,6 +23,8 @@ const DEFAULTS = {
   twClientId:  '',
   // パネル表示順（インデックス i のパネルに CSS order = visualOrder[i] を適用）
   visualOrder: [],
+  // PC表示を強制（外部ディスプレイへのミラーリング等で画面幅から自動判定できない場合の手動切り替え）
+  forceDesktop: false,
 };
 
 const useExtStorage =

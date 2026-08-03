@@ -1083,6 +1083,7 @@ async function init() {
   setValue('tw-parent',    settings.twParent);
   setValue('tw-relay-url', settings.twRelayUrl);
   setValue('tw-client-id', settings.twClientId);
+  applyForceDesktop(!!settings.forceDesktop);
 
   // 同期基準
   syncRefIdx = Math.min(settings.syncRefIdx ?? 0, (settings.panelCount ?? 2) - 1);
@@ -1341,6 +1342,25 @@ document.getElementById('tw-relay-url').addEventListener('change', (e) => {
 document.getElementById('tw-client-id').addEventListener('change', (e) => {
   settings.twClientId = e.target.value.trim();
   saveSettings({ twClientId: settings.twClientId });
+});
+
+// PC表示を強制: viewportの幅を固定し、実際の画面幅に関わらずCSSのモバイル用@mediaを発火させないようにする
+// （XREAL等の外部ディスプレイにスマホ画面をそのままミラーリングしている場合、ブラウザからは
+//  依然としてスマホの狭い解像度に見えるため、通常の判定では自動的にPC表示に切り替わらない。
+//  モバイルブラウザの「デスクトップ用サイトをリクエスト」と同じ仕組み）
+const FORCE_DESKTOP_VIEWPORT = 'width=1024, viewport-fit=cover';
+const NORMAL_VIEWPORT        = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
+
+function applyForceDesktop(enabled) {
+  document.querySelector('meta[name="viewport"]').setAttribute('content',
+    enabled ? FORCE_DESKTOP_VIEWPORT : NORMAL_VIEWPORT);
+  document.getElementById('btn-force-desktop').classList.toggle('is-active', enabled);
+}
+
+document.getElementById('btn-force-desktop').addEventListener('click', () => {
+  settings.forceDesktop = !settings.forceDesktop;
+  applyForceDesktop(settings.forceDesktop);
+  saveSettings({ forceDesktop: settings.forceDesktop });
 });
 
 init().catch(console.error);
