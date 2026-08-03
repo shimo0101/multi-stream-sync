@@ -97,8 +97,8 @@ function createPanelHTML(idx) {
           <button id="btn-chat-${idx}" class="btn btn--chat" disabled>チャット開始</button>
           <span id="chat-hint-${idx}" class="hint"></span>
           <button id="btn-comments-${idx}" class="btn btn--comments" disabled>💬 コメント</button>
-          <button id="btn-chat-replay-${idx}" class="btn btn--secondary" disabled
-                  title="yt-dlpで取得したlive_chat.jsonを読み込み、アーカイブ再生に同期してチャットを再現する">📄 チャット読込</button>
+          <button id="btn-chat-replay-${idx}" class="btn btn--secondary"
+                  title="yt-dlpで取得したlive_chat.jsonを読み込み、アーカイブ再生に同期してチャットを再現する（ファイル名から動画を自動読み込み）">📄 チャット読込</button>
           <input type="file" id="chat-replay-file-${idx}" accept=".json,application/json" hidden>
         </div>
         <div class="comments-panel" id="comments-panel-${idx}" hidden>
@@ -298,7 +298,6 @@ class PanelController {
       this.resetComments();
       document.getElementById(`btn-comments-${this.idx}`).disabled = false;
       this.resetChatReplay();
-      document.getElementById(`btn-chat-replay-${this.idx}`).disabled = false;
       this.liveChatChannelId = null; // 動画が変わったので古いチャンネルIDは無効化（ライブチャット開始時に再解決する）
       const savedPos = await cbResolveResumePosition('youtube', videoId, getPlaybackPosition(this.resumeKey));
       player.load(videoId, { muted: this.isMuted, startSeconds: savedPos || 0 });
@@ -407,7 +406,6 @@ class PanelController {
     this.clearChatReplayTimers();
     this.chatReplayItems = [];
     this.chatReplayIdx   = 0;
-    document.getElementById(`btn-chat-replay-${this.idx}`).disabled = true;
     document.getElementById(`chat-replay-file-${this.idx}`).value   = '';
   }
 
@@ -416,8 +414,19 @@ class PanelController {
     this.chatReplayTimers = [];
   }
 
-  // yt-dlp --write-subs --sub-langs live_chat で取得した .live_chat.json (JSON Lines) を読み込む
+  // yt-dlp --write-subs --sub-langs live_chat で取得した .live_chat.json (JSON Lines) を読み込む。
+  // yt-dlpのデフォルト出力テンプレートはファイル名に "[動画ID]" を含むため、
+  // 未読み込み/別動画の場合はファイル名から動画IDを判別して自動的に動画も読み込む
   async loadChatReplayFile(file) {
+    const videoId = extractYouTubeIdFromFilename(file.name);
+    if (videoId && videoId !== this.loadedId) {
+      document.getElementById(`url-${this.idx}`).value = videoId;
+      await this.load(videoId);
+    } else if (!videoId && !this.loadedId) {
+      setStatus(`P${this.idx + 1}: ファイル名から動画IDを判別できませんでした。先に動画URLを読み込んでください`, 'error');
+      return;
+    }
+
     let text;
     try {
       text = await file.text();
@@ -1628,6 +1637,14 @@ async function resolveChannelIdForVideo(videoId) {
 }
 
 // ===== yt-dlp live_chat.json（アーカイブ視聴用チャットリプレイ）=====
+
+// yt-dlpのデフォルト出力テンプレート（%(title)s [%(id)s].%(ext)s）では
+// ファイル名に "[動画ID]" が含まれるため、そこから動画IDを取り出す。
+// 複数の "[...]" があり得るので、動画ID(11文字)のパターンに一致する最後の候補を採用する
+function extractYouTubeIdFromFilename(name) {
+  const matches = [...(name ?? '').matchAll(/\[([A-Za-z0-9_-]{11})\]/g)];
+  return matches.length ? matches[matches.length - 1][1] : null;
+}
 
 // message.runs（テキスト・絵文字/スタンプが混在する配列）からテキストとスタンプ画像情報を抽出する。
 // 投稿者（配信チャンネル）ごとに固有のスタンプ画像URLはrun自体に含まれているため、
