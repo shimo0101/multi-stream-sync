@@ -11,10 +11,10 @@ const DEFAULTS = {
   layout:       'lp2-h',
   syncRefIdx:   0,
   // パネル 0〜3（最大4枚）
-  p0Platform: 'youtube', p0Url: '', p0Start: '',
-  p1Platform: 'twitch',  p1Url: '', p1Start: '',
-  p2Platform: 'youtube', p2Url: '', p2Start: '',
-  p3Platform: 'youtube', p3Url: '', p3Start: '',
+  p0Platform: 'youtube', p0Url: '', p0Start: '', p0PlaylistId: '',
+  p1Platform: 'twitch',  p1Url: '', p1Start: '', p1PlaylistId: '',
+  p2Platform: 'youtube', p2Url: '', p2Start: '', p2PlaylistId: '',
+  p3Platform: 'youtube', p3Url: '', p3Start: '', p3PlaylistId: '',
   // 共通
   ytApiKey:    '',
   ytRelayUrl:  '',

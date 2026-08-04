@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="../icons/icon-96.png">
   <link rel="manifest" href="pwa.webmanifest">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=51">
+  <link rel="stylesheet" href="dashboard.css?v=53">
 </head>
 <body>
 
@@ -113,6 +113,7 @@
     <div class="cb-tabs">
       <button class="cb-tab cb-tab--active" data-cb-tab="youtube">YouTube</button>
       <button class="cb-tab" data-cb-tab="twitch">Twitch</button>
+      <button class="cb-tab" data-cb-tab="playlist">プレイリスト</button>
     </div>
     <!-- チャンネルブラウザ内ステータス（モバイル用） -->
     <div class="cb-status-bar" id="cb-status-bar" hidden></div>
@@ -156,11 +157,21 @@
       </div>
       <ul class="cb-list" id="cb-tw-list"></ul>
     </div>
+    <div class="cb-pane cb-pane--hidden" id="cb-pane-playlist">
+      <div class="cb-add-row">
+        <input id="cb-pl-input" class="input" placeholder="プレイリストのURL または ID">
+        <button id="cb-pl-add" class="btn btn--primary">追加</button>
+      </div>
+      <div class="cb-list-toolbar">
+        <button id="cb-pl-edit-toggle" class="cb-edit-toggle">✏ 編集</button>
+      </div>
+      <ul class="cb-list" id="cb-pl-list"></ul>
+    </div>
   </aside>
 
   <!-- チャンネルブラウザ バックドロップ（モバイルのみ表示） -->
   <div class="cb-backdrop" id="cb-backdrop"></div>
 
-  <script type="module" src="dashboard.js?v=52"></script>
+  <script type="module" src="dashboard.js?v=54"></script>
 </body>
 </html>

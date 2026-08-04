@@ -378,6 +378,9 @@ body {
 
 .config-label { font-size: 12px; color: #9ca3af; white-space: nowrap; }
 .hint { font-size: 11px; color: #6b7280; }
+.zap-pos { font-size: 12px; color: #9ca3af; white-space: nowrap; min-width: 34px; text-align: center; }
+/* .config-rowのdisplay:flexが[hidden]のUAデフォルト(display:none)より詳細度で勝ってしまうため明示的に上書きする */
+.zap-bar[hidden] { display: none; }
 
 /* ===== Player Area ===== */
 .player-wrap {

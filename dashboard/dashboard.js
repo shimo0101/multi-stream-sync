@@ -101,6 +101,13 @@ function createPanelHTML(idx) {
                   title="yt-dlpで取得したlive_chat.jsonを読み込み、アーカイブ再生に同期してチャットを再現する（ファイル名から動画を自動読み込み）">📄 チャット読込</button>
           <input type="file" id="chat-replay-file-${idx}" accept=".json,application/json" hidden>
         </div>
+        <div class="config-row zap-bar" id="zap-bar-${idx}" hidden>
+          <button id="btn-zap-prev-${idx}" class="btn btn--secondary" title="前の動画へ">◀ 前へ</button>
+          <span id="zap-pos-${idx}" class="zap-pos"></span>
+          <button id="btn-zap-next-${idx}" class="btn btn--secondary" title="次の動画へ">次へ ▶</button>
+          <button id="btn-zap-refresh-${idx}" class="btn btn--secondary" title="プレイリストを再取得">🔄</button>
+          <button id="btn-zap-exit-${idx}" class="btn btn--secondary" title="リスト読み込みモードを終了">✕</button>
+        </div>
         <div class="comments-panel" id="comments-panel-${idx}" hidden>
           <div class="comments-panel-header">
             <span class="comments-panel-title">💬 コメント</span>
@@ -149,6 +156,8 @@ class PanelController {
     this.chatReplayIdx    = 0;  // 次に表示すべき chatReplayItems のインデックス
     this.chatReplayTimers = []; // 表示ずらし用の保留中setTimeout ID
     this.liveChatChannelId = null; // ライブチャット表示中の動画の投稿チャンネルID（スタンプ辞書の照合に使用）
+    this.playlistId     = null; // リスト読み込みモード中のプレイリストID（YouTubeのみ対応）
+    this.playlistVideos = [];   // [{videoId, title}]（再生順）。ザッピングの前へ/次へで参照する
     this.overlay       = new CommentOverlay(document.getElementById(`canvas-${idx}`));
 
     this._ytPlayer = null;
@@ -209,6 +218,14 @@ class PanelController {
     document.getElementById(`btn-chat-replay-${this.idx}`).hidden = (platform !== 'youtube');
     this.resetChatReplay();
     this.liveChatChannelId = null;
+
+    // リスト読み込みモード（ザッピング）もYouTubeのみ対応。プラットフォーム切替時は必ず解除する
+    document.getElementById(`zap-bar-${this.idx}`).hidden = true;
+    if (this.playlistId) {
+      this.playlistId     = null;
+      this.playlistVideos = [];
+      saveSettings({ [`p${this.idx}PlaylistId`]: '' });
+    }
 
     document.querySelectorAll(`[data-panel="${this.idx}"] .plat-btn`).forEach(b =>
       b.classList.toggle('active', b.dataset.platform === platform)
@@ -299,6 +316,8 @@ class PanelController {
       document.getElementById(`btn-comments-${this.idx}`).disabled = false;
       this.resetChatReplay();
       this.liveChatChannelId = null; // 動画が変わったので古いチャンネルIDは無効化（ライブチャット開始時に再解決する）
+      // 設定から復元したリスト読み込みモード（ページ再読み込み直後など）は、動画一覧をまだ持っていないので遅延取得する
+      if (this.playlistId && !this.playlistVideos.length) this.hydratePlaylistZapBar();
       const savedPos = await cbResolveResumePosition('youtube', videoId, getPlaybackPosition(this.resumeKey));
       player.load(videoId, { muted: this.isMuted, startSeconds: savedPos || 0 });
       syncManager.registerPlayer(`p${this.idx}`, player);
@@ -453,6 +472,70 @@ class PanelController {
       const allStamps = items.flatMap(it => it.stamps ?? []);
       registerStamps(channelId, allStamps);
     }
+  }
+
+  // プレイリストをこのパネルで開き、リスト読み込みモードに入る（先頭 or 指定動画を読み込む）
+  enterPlaylistMode(playlistId, videos, resumeVideoId) {
+    this.playlistId     = playlistId;
+    this.playlistVideos = videos;
+    document.getElementById(`zap-bar-${this.idx}`).hidden = false;
+    this.load(resumeVideoId || videos[0].videoId);
+    this.updateZapPosLabel();
+  }
+
+  // 設定から復元したリスト読み込みモード（ページ再読み込み直後）は動画一覧をまだ持っていないため、遅延取得する
+  async hydratePlaylistZapBar() {
+    try {
+      const videos = await cbFetchPlaylistVideos(this.playlistId);
+      if (!videos.length) return;
+      this.playlistVideos = videos;
+      document.getElementById(`zap-bar-${this.idx}`).hidden = false;
+      this.updateZapPosLabel();
+    } catch {}
+  }
+
+  updateZapPosLabel() {
+    const label = document.getElementById(`zap-pos-${this.idx}`);
+    if (!label) return;
+    if (!this.playlistVideos.length) { label.textContent = ''; return; }
+    const idx = this.playlistVideos.findIndex(v => v.videoId === this.loadedId);
+    label.textContent = `${idx >= 0 ? idx + 1 : '?'}/${this.playlistVideos.length}`;
+  }
+
+  // 前へ(-1)/次へ(+1)。現在の動画がリストに無ければ先頭扱いにする（末端でのラップアラウンドあり）
+  zapPlaylist(delta) {
+    const len = this.playlistVideos.length;
+    if (!len) return;
+    const curIdx = this.playlistVideos.findIndex(v => v.videoId === this.loadedId);
+    const idx    = curIdx === -1 ? 0 : (curIdx + delta + len) % len;
+    const video  = this.playlistVideos[idx];
+    document.getElementById(`url-${this.idx}`).value = video.videoId;
+    this.load(video.videoId);
+    saveSettings({ [`p${this.idx}Url`]: video.videoId });
+    this.updateZapPosLabel();
+  }
+
+  // プレイリストの動画一覧を再取得する（YouTube側で中身を編集した場合に反映させるため）
+  async refreshPlaylist() {
+    if (!this.playlistId) return;
+    setStatus(`P${this.idx + 1}: プレイリストを再取得中…`);
+    try {
+      const videos = await cbFetchPlaylistVideos(this.playlistId);
+      if (!videos.length) { setStatus(`P${this.idx + 1}: プレイリストに動画が見つかりませんでした`, 'error'); return; }
+      this.playlistVideos = videos;
+      this.updateZapPosLabel();
+      setStatus(`P${this.idx + 1}: プレイリストを更新しました（${videos.length}件）`, 'ok');
+    } catch (err) {
+      setStatus(`P${this.idx + 1}: プレイリストの再取得に失敗しました: ${err.message}`, 'error');
+    }
+  }
+
+  // リスト読み込みモードを終了する（✕ボタン。現在再生中の動画自体はそのまま）
+  exitPlaylistMode() {
+    this.playlistId     = null;
+    this.playlistVideos = [];
+    document.getElementById(`zap-bar-${this.idx}`).hidden = true;
+    saveSettings({ [`p${this.idx}PlaylistId`]: '' });
   }
 
   // 現在の再生位置に応じて、表示すべきチャットリプレイ項目をオーバーレイに追加する
@@ -795,6 +878,12 @@ function bindPanelEvents(idx) {
     const file = e.target.files?.[0];
     if (file) panels[idx].loadChatReplayFile(file);
   });
+
+  // リスト読み込みモード（ザッピング）
+  document.getElementById(`btn-zap-prev-${idx}`).addEventListener('click', () => panels[idx].zapPlaylist(-1));
+  document.getElementById(`btn-zap-next-${idx}`).addEventListener('click', () => panels[idx].zapPlaylist(1));
+  document.getElementById(`btn-zap-refresh-${idx}`).addEventListener('click', () => panels[idx].refreshPlaylist());
+  document.getElementById(`btn-zap-exit-${idx}`).addEventListener('click', () => panels[idx].exitPlaylistMode());
 }
 
 // ===== ドラッグ並び替え =====
@@ -1107,6 +1196,9 @@ async function init() {
       syncManager.setStartTime(`p${i}`, settings[`p${i}Start`]);
     }
 
+    // リスト読み込みモードの復元（動画一覧はまだ取得せず、実際に読込したタイミングで遅延取得する）
+    if (settings[`p${i}PlaylistId`]) p.playlistId = settings[`p${i}PlaylistId`];
+
     bindPanelEvents(i);
   }
 
@@ -1370,17 +1462,17 @@ init().catch(console.error);
 const CB_STORAGE_KEY = 'multi-stream-sync-favorites';
 
 // お気に入りデータ（ライブ状態はメモリのみ、永続化しない）
-let cbFavorites    = { youtube: [], twitch: [] };
+let cbFavorites    = { youtube: [], twitch: [], playlists: [] };
 let cbYtLiveSorted = false;
 let cbTwLiveSorted = false;
 
-// チャンネルのグループ分け（タブ）
+// チャンネルのグループ分け（タブ）。プレイリストはグループ分け非対応
 let cbGroups       = { youtube: [], twitch: [] };          // [{id, name}]
 let cbActiveGroup  = { youtube: null, twitch: null };      // null=すべて, 'none'=未分類, それ以外=group.id
 
 // 編集モード（並べ替え・削除・グループ移動ボタンは誤操作防止のため通常時は非表示にし、
 // このモードのときだけ表示する）
-let cbEditMode = { youtube: false, twitch: false };
+let cbEditMode = { youtube: false, twitch: false, playlists: false };
 
 function cbGroupOptionsHtml(platform, currentGroupId) {
   const opts = [`<option value=""${!currentGroupId ? ' selected' : ''}>未分類</option>`];
@@ -1398,15 +1490,16 @@ function cbLoad() {
   try {
     const stored = JSON.parse(localStorage.getItem(CB_STORAGE_KEY) || '{}');
     cbFavorites = {
-      youtube: (stored.youtube ?? []).map(ch => ({ ...ch, groupId: ch.groupId ?? null, liveVideoId: null, liveTitle: null })),
-      twitch:  (stored.twitch  ?? []).map(ch => ({ ...ch, groupId: ch.groupId ?? null, isLive: false, liveTitle: null })),
+      youtube:   (stored.youtube   ?? []).map(ch => ({ ...ch, groupId: ch.groupId ?? null, liveVideoId: null, liveTitle: null })),
+      twitch:    (stored.twitch    ?? []).map(ch => ({ ...ch, groupId: ch.groupId ?? null, isLive: false, liveTitle: null })),
+      playlists: (stored.playlists ?? []).map(pl => ({ ...pl })),
     };
     cbGroups = {
       youtube: stored.groupsYoutube ?? [],
       twitch:  stored.groupsTwitch  ?? [],
     };
   } catch {
-    cbFavorites = { youtube: [], twitch: [] };
+    cbFavorites = { youtube: [], twitch: [], playlists: [] };
     cbGroups    = { youtube: [], twitch: [] };
   }
 }
@@ -1414,8 +1507,9 @@ function cbLoad() {
 function cbSave() {
   try {
     const data = {
-      youtube: cbFavorites.youtube.map(({ channelId, name, thumbnailUrl, groupId }) => ({ channelId, name, thumbnailUrl, groupId })),
-      twitch:  cbFavorites.twitch.map(({ username, thumbnailUrl, groupId }) => ({ username, thumbnailUrl, groupId })),
+      youtube:   cbFavorites.youtube.map(({ channelId, name, thumbnailUrl, groupId }) => ({ channelId, name, thumbnailUrl, groupId })),
+      twitch:    cbFavorites.twitch.map(({ username, thumbnailUrl, groupId }) => ({ username, thumbnailUrl, groupId })),
+      playlists: cbFavorites.playlists.map(({ playlistId, name, thumbnailUrl }) => ({ playlistId, name, thumbnailUrl })),
       groupsYoutube: cbGroups.youtube,
       groupsTwitch:  cbGroups.twitch,
     };
@@ -1768,6 +1862,44 @@ async function cbResolveYouTubeChannel(input) {
   };
 }
 
+// プレイリストURL（?list=... / watch?v=...&list=...）またはベアIDからプレイリストIDを取り出す
+function parsePlaylistId(raw) {
+  const clean = raw.trim();
+  try {
+    const list = new URL(clean).searchParams.get('list');
+    if (list) return list;
+  } catch {}
+  return /^[\w-]{10,64}$/.test(clean) ? clean : null;
+}
+
+// プレイリストのタイトル・サムネイルを取得する（限定公開でもIDが分かればAPIキーのみで取得可能）
+async function cbResolvePlaylist(input) {
+  const apiKey = settings.ytApiKey;
+  if (!apiKey) throw new Error('YouTube API Key が未設定です（⚙ 共通設定で入力してください）');
+
+  const playlistId = parsePlaylistId(input);
+  if (!playlistId) throw new Error('有効なプレイリストのURLまたはIDを入力してください');
+
+  const url = new URL('https://www.googleapis.com/youtube/v3/playlists');
+  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('id', playlistId);
+  url.searchParams.set('key', apiKey);
+
+  const res = await fetch(url);
+  if (res.status === 403) throw new Error('API キーが無効です');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const data = await res.json();
+  const item = data.items?.[0];
+  if (!item) throw new Error('プレイリストが見つかりません（限定公開の場合はIDを確認してください）');
+
+  return {
+    playlistId,
+    name:         item.snippet.title,
+    thumbnailUrl: item.snippet.thumbnails?.default?.url ?? null,
+  };
+}
+
 // YouTube: ライブ配信中の動画を取得
 function cbSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -1837,6 +1969,32 @@ async function cbFetchLiveStatusBatch(videoIds) {
     } catch {}
   }
   return result;
+}
+
+// 登録済みプレイリストの動画一覧を取得する（再生順、先頭50件まで・ページネーション無し）
+async function cbFetchPlaylistVideos(playlistId) {
+  const apiKey = settings.ytApiKey;
+  if (!apiKey) throw new Error('YouTube API Key が未設定です（⚙ 共通設定で入力してください）');
+
+  const plUrl = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+  plUrl.searchParams.set('part', 'contentDetails');
+  plUrl.searchParams.set('playlistId', playlistId);
+  plUrl.searchParams.set('maxResults', '50');
+  plUrl.searchParams.set('key', apiKey);
+
+  const plData   = await cbFetchJsonWithRetry(plUrl);
+  const videoIds = (plData?.items ?? []).map(i => i.contentDetails.videoId);
+  if (!videoIds.length) return [];
+
+  const vUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+  vUrl.searchParams.set('part', 'snippet');
+  vUrl.searchParams.set('id', videoIds.join(','));
+  vUrl.searchParams.set('key', apiKey);
+  const vData     = await cbFetchJsonWithRetry(vUrl);
+  const titleById = new Map((vData?.items ?? []).map(v => [v.id, v.snippet.title]));
+
+  // videos.list側の順序はplaylistItemsと一致しない場合があるため、再生順はvideoIds側を正とする
+  return videoIds.map(id => ({ videoId: id, title: titleById.get(id) ?? id }));
 }
 
 // パネル選択ボタンを生成（現在存在するパネル数に応じて）
@@ -1947,6 +2105,43 @@ function cbRenderTwList() {
         </div>` : ''}` : ''}
       </div>
       ${cbEditMode.twitch ? `<button class="cb-del-btn cb-item-del" data-cb-tw-del="${ch.origIdx}">✕</button>` : ''}
+    </li>
+  `).join('');
+}
+
+// プレイリストはグループ分け非対応のため、cbGetFilteredView(platform)を'playlists'で呼んでも
+// cbActiveGroup.playlists は未定義=falsyとなり、常に全件がそのまま返る
+function cbRenderPlaylistList() {
+  const list = document.getElementById('cb-pl-list');
+  if (!cbFavorites.playlists.length) {
+    list.innerHTML = '<li class="cb-empty">プレイリストを追加してください</li>';
+    return;
+  }
+  const view = cbGetFilteredView('playlists');
+  const last = view.length - 1;
+  list.innerHTML = view.map((pl, vi) => `
+    <li class="cb-item${cbEditMode.playlists ? ' is-editing' : ''}">
+      ${pl.thumbnailUrl
+        ? `<img class="cb-avatar" src="${escHtml(pl.thumbnailUrl)}" alt="">`
+        : `<div class="cb-avatar-initial" style="background:#7c3aed">${escHtml(pl.name[0] ?? '?')}</div>`
+      }
+      <div class="cb-info">
+        <div class="cb-name">${escHtml(pl.name)}</div>
+        <div class="cb-status">プレイリスト</div>
+      </div>
+      <div class="cb-actions">
+        <div class="cb-panel-row">
+          ${panels.map((_, pi) =>
+            `<button class="cb-open-btn" data-cb-pl-open="${pl.origIdx}" data-panel="${pi}">P${pi + 1}</button>`
+          ).join('')}
+        </div>
+        ${cbEditMode.playlists ? `
+        <div class="cb-reorder-row">
+          <button class="cb-reorder-btn" data-cb-pl-up="${pl.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
+          <button class="cb-reorder-btn" data-cb-pl-down="${pl.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
+        </div>` : ''}
+      </div>
+      ${cbEditMode.playlists ? `<button class="cb-del-btn cb-item-del" data-cb-pl-del="${pl.origIdx}">✕</button>` : ''}
     </li>
   `).join('');
 }
@@ -2085,6 +2280,7 @@ document.getElementById('channel-browser').addEventListener('keydown', (e) => {
 function cbOpen() {
   cbRenderYtList();
   cbRenderTwList();
+  cbRenderPlaylistList();
   document.getElementById('channel-browser').classList.add('is-open');
   document.getElementById('btn-browser').classList.add('is-open');
   document.getElementById('cb-backdrop').classList.add('is-open');
@@ -2290,6 +2486,35 @@ async function cbTwAdd() {
 document.getElementById('cb-tw-add').addEventListener('click', cbTwAdd);
 document.getElementById('cb-tw-input').addEventListener('keydown', e => { if (e.key === 'Enter') cbTwAdd(); });
 
+// プレイリスト: 追加（Enter / ボタン）
+async function cbPlaylistAdd() {
+  const input = document.getElementById('cb-pl-input').value.trim();
+  if (!input) return;
+
+  const btn = document.getElementById('cb-pl-add');
+  btn.disabled = true;
+  btn.textContent = '検索中…';
+
+  try {
+    const pl = await cbResolvePlaylist(input);
+    if (!cbFavorites.playlists.some(p => p.playlistId === pl.playlistId)) {
+      cbFavorites.playlists.push(pl);
+      cbSave();
+    }
+    document.getElementById('cb-pl-input').value = '';
+    cbRenderPlaylistList();
+    cbSetStatus(`プレイリスト "${pl.name}" を追加しました`, 'ok');
+  } catch (err) {
+    cbSetStatus(`追加エラー: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '追加';
+  }
+}
+
+document.getElementById('cb-pl-add').addEventListener('click', cbPlaylistAdd);
+document.getElementById('cb-pl-input').addEventListener('keydown', e => { if (e.key === 'Enter') cbPlaylistAdd(); });
+
 // Twitch: ライブ確認
 async function cbFetchTwitchLiveStreams() {
   const token    = localStorage.getItem('mss-tw-token');
@@ -2463,6 +2688,57 @@ document.getElementById('cb-tw-list').addEventListener('click', (e) => {
   }
 });
 
+// プレイリストリスト: 並び替え・削除・パネル展開（イベント委任）
+document.getElementById('cb-pl-list').addEventListener('click', (e) => {
+  const upIdx = e.target.dataset.cbPlUp;
+  if (upIdx != null) {
+    cbSwapWithFilteredNeighbor('playlists', Number(upIdx), -1);
+    cbSave(); cbRenderPlaylistList(); return;
+  }
+
+  const downIdx = e.target.dataset.cbPlDown;
+  if (downIdx != null) {
+    cbSwapWithFilteredNeighbor('playlists', Number(downIdx), 1);
+    cbSave(); cbRenderPlaylistList(); return;
+  }
+
+  const delIdx = e.target.dataset.cbPlDel;
+  if (delIdx != null) {
+    cbFavorites.playlists.splice(Number(delIdx), 1);
+    cbSave();
+    cbRenderPlaylistList();
+    return;
+  }
+
+  const openIdx  = e.target.dataset.cbPlOpen;
+  const panelIdx = e.target.dataset.panel;
+  if (openIdx != null && panelIdx != null) {
+    const pl = cbFavorites.playlists[Number(openIdx)];
+    if (!pl) return;
+    cbOpenPlaylistInPanel(pl, Number(panelIdx));
+  }
+});
+
+// プレイリストをパネルに開く: 動画一覧を取得し、先頭動画を読み込んでリスト読み込みモードに入る
+async function cbOpenPlaylistInPanel(pl, pi) {
+  cbSetStatus(`プレイリスト "${pl.name}" を取得中…`);
+  let videos;
+  try {
+    videos = await cbFetchPlaylistVideos(pl.playlistId);
+  } catch (err) {
+    cbSetStatus(`プレイリストの取得に失敗しました: ${err.message}`, 'error');
+    return;
+  }
+  if (!videos.length) {
+    cbSetStatus('プレイリストに動画が見つかりませんでした', 'error');
+    return;
+  }
+  panels[pi].setPlatform('youtube');
+  panels[pi].enterPlaylistMode(pl.playlistId, videos);
+  saveSettings({ [`p${pi}Platform`]: 'youtube', [`p${pi}PlaylistId`]: pl.playlistId, [`p${pi}Url`]: videos[0].videoId });
+  cbClose();
+}
+
 // チャンネルのグループ移動（編集モード中のセレクトボックス）
 document.getElementById('cb-yt-list').addEventListener('change', (e) => {
   const sel = e.target.closest('[data-cb-yt-group-move]');
@@ -2532,6 +2808,13 @@ document.getElementById('cb-tw-edit-toggle').addEventListener('click', () => {
   cbRenderTwList();
 });
 
+document.getElementById('cb-pl-edit-toggle').addEventListener('click', () => {
+  cbEditMode.playlists = !cbEditMode.playlists;
+  document.getElementById('cb-pl-edit-toggle').classList.toggle('is-active', cbEditMode.playlists);
+  document.getElementById('cb-pl-edit-toggle').textContent = cbEditMode.playlists ? '✓ 完了' : '✏ 編集';
+  cbRenderPlaylistList();
+});
+
 // picker ページからの BroadcastChannel メッセージを受信
 try {
   const pickerBC = new BroadcastChannel('mss-picker');
@@ -2558,6 +2841,7 @@ function cbExport() {
   const data = {
     yt: cbFavorites.youtube.map(ch => ({ i: ch.channelId, n: ch.name, g: ch.groupId || undefined })),
     tw: cbFavorites.twitch.map(ch => ({ u: ch.username, g: ch.groupId || undefined })),
+    pl: cbFavorites.playlists.map(pl => ({ i: pl.playlistId, n: pl.name })),
     gy: cbGroups.youtube.map(g => ({ i: g.id, n: g.name })),
     gt: cbGroups.twitch.map(g => ({ i: g.id, n: g.name })),
   };
@@ -2599,6 +2883,12 @@ function cbImport(b64raw) {
       if (ch.u && !cbFavorites.twitch.some(c => c.username === ch.u)) {
         const groupId = ch.g && cbGroups.twitch.some(g => g.id === ch.g) ? ch.g : null;
         cbFavorites.twitch.push({ username: ch.u, groupId });
+        added++;
+      }
+    }
+    for (const pl of (data.pl || [])) {
+      if (pl.i && !cbFavorites.playlists.some(p => p.playlistId === pl.i)) {
+        cbFavorites.playlists.push({ playlistId: pl.i, name: pl.n || pl.i, thumbnailUrl: null });
         added++;
       }
     }
