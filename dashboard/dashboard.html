@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="../icons/icon-96.png">
   <link rel="manifest" href="pwa.webmanifest">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=53">
+  <link rel="stylesheet" href="dashboard.css?v=54">
 </head>
 <body>
 
@@ -67,9 +67,10 @@
         <label class="config-label">スタンプ辞書</label>
         <div class="settings-item-row">
           <button id="btn-stamp-dict-export" class="btn btn--secondary" title="スタンプ辞書をJSONファイルとして書き出す">書き出す</button>
-          <button id="btn-stamp-dict-import" class="btn btn--secondary" title="書き出したJSONファイルを読み込んでマージする">読み込む</button>
+          <button id="btn-stamp-dict-import" class="btn btn--secondary" title="書き出したJSONファイルを読み込んでマージする（ローカルより新しいチャンネルのみ反映）">読み込む</button>
           <input type="file" id="stamp-dict-file" accept=".json,application/json" hidden>
         </div>
+        <ul id="stamp-dict-list" class="stamp-dict-list"></ul>
       </div>
       <div class="settings-item">
         <label class="config-label">表示モード</label>
@@ -172,6 +173,6 @@
   <!-- チャンネルブラウザ バックドロップ（モバイルのみ表示） -->
   <div class="cb-backdrop" id="cb-backdrop"></div>
 
-  <script type="module" src="dashboard.js?v=54"></script>
+  <script type="module" src="dashboard.js?v=55"></script>
 </body>
 </html>

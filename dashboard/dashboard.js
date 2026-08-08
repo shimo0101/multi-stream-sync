@@ -1486,6 +1486,12 @@ function cbGenGroupId() {
   return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+// 「更新: 2026/08/08」のような短い日付表記に変換（登録・アイコン更新時刻の表示用）
+function cbFormatDate(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
 function cbLoad() {
   try {
     const stored = JSON.parse(localStorage.getItem(CB_STORAGE_KEY) || '{}');
@@ -1507,9 +1513,9 @@ function cbLoad() {
 function cbSave() {
   try {
     const data = {
-      youtube:   cbFavorites.youtube.map(({ channelId, name, thumbnailUrl, groupId }) => ({ channelId, name, thumbnailUrl, groupId })),
-      twitch:    cbFavorites.twitch.map(({ username, thumbnailUrl, groupId }) => ({ username, thumbnailUrl, groupId })),
-      playlists: cbFavorites.playlists.map(({ playlistId, name, thumbnailUrl }) => ({ playlistId, name, thumbnailUrl })),
+      youtube:   cbFavorites.youtube.map(({ channelId, name, thumbnailUrl, groupId, updatedAt }) => ({ channelId, name, thumbnailUrl, groupId, updatedAt })),
+      twitch:    cbFavorites.twitch.map(({ username, thumbnailUrl, groupId, updatedAt }) => ({ username, thumbnailUrl, groupId, updatedAt })),
+      playlists: cbFavorites.playlists.map(({ playlistId, name, thumbnailUrl, updatedAt }) => ({ playlistId, name, thumbnailUrl, updatedAt })),
       groupsYoutube: cbGroups.youtube,
       groupsTwitch:  cbGroups.twitch,
     };
@@ -1656,6 +1662,7 @@ function registerStamps(channelId, stamps) {
 
   trimStampDictionary(dict);
   saveStampDictionary(dict);
+  cbRenderStampDictList();
 }
 
 // スタンプ辞書全体をJSONファイルとしてダウンロードする（別端末への共有用）
@@ -1670,8 +1677,9 @@ function exportStampDictionary() {
   URL.revokeObjectURL(url);
 }
 
-// exportStampDictionary()で書き出したJSONファイルを取り込み、既存の辞書にマージする
-// （同じチャンネル・同じshortcutは取り込んだ側で上書き。取り込んだチャンネルはatを現在時刻に更新）
+// exportStampDictionary()で書き出したJSONファイルを取り込み、既存の辞書にマージする。
+// チャンネル単位で「新しい版（at）」を管理し、取り込み側のatがローカルより新しい場合のみ反映する
+// （複数端末間で古いファイルを読み込んでも、ローカルの新しいスタンプ登録が上書きされて消えることがない）
 async function importStampDictionaryFile(file) {
   let imported;
   try {
@@ -1684,23 +1692,47 @@ async function importStampDictionaryFile(file) {
   const dict = loadStampDictionary();
   let channelCount = 0;
   let entryCount   = 0;
+  let skippedCount = 0;
   for (const [channelId, src] of Object.entries(imported)) {
     if (!src?.entries || typeof src.entries !== 'object') continue;
-    const entry = dict[channelId] ?? { entries: {}, at: 0 };
+    const importAt = typeof src.at === 'number' ? src.at : 0;
+    const existing  = dict[channelId];
+    if (existing && existing.at >= importAt) { skippedCount++; continue; }
+
+    const entry = existing ?? { entries: {}, at: 0 };
     for (const [shortcut, url] of Object.entries(src.entries)) {
       if (typeof shortcut === 'string' && typeof url === 'string') {
         entry.entries[shortcut] = url;
         entryCount++;
       }
     }
-    entry.at = Date.now();
+    entry.at = importAt;
     dict[channelId] = entry;
     channelCount++;
   }
 
   trimStampDictionary(dict);
   saveStampDictionary(dict);
-  return { channelCount, entryCount };
+  cbRenderStampDictList();
+  return { channelCount, entryCount, skippedCount };
+}
+
+// スタンプ辞書のチャンネルごとの最終更新日を、共通設定パネルに一覧表示する
+function cbRenderStampDictList() {
+  const el = document.getElementById('stamp-dict-list');
+  if (!el) return;
+  const dict = loadStampDictionary();
+  const rows = Object.entries(dict).sort(([, a], [, b]) => (b.at ?? 0) - (a.at ?? 0));
+  if (!rows.length) {
+    el.innerHTML = '<li class="stamp-dict-empty">まだ登録されたスタンプはありません</li>';
+    return;
+  }
+  el.innerHTML = rows.map(([channelId, entry]) => {
+    const name  = cbFavorites.youtube.find(ch => ch.channelId === channelId)?.name ?? channelId;
+    const count = Object.keys(entry.entries ?? {}).length;
+    return `<li><span class="stamp-dict-name">${escHtml(name)}</span>` +
+           `<span class="stamp-dict-meta">${count}件・更新: ${cbFormatDate(entry.at)}</span></li>`;
+  }).join('');
 }
 
 // テキスト中の ":shortcut:" パターンを、指定チャンネルの辞書と照合してスタンプ画像に置き換える。
@@ -2034,6 +2066,7 @@ function cbRenderYtList() {
             ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
             : '配信なし'}
         </div>
+        ${ch.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(ch.updatedAt)}</div>` : ''}
       </div>
       <div class="cb-actions">
         <div class="cb-panel-row">
@@ -2087,6 +2120,7 @@ function cbRenderTwList() {
             ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
             : 'Twitch'}
         </div>
+        ${ch.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(ch.updatedAt)}</div>` : ''}
       </div>
       <div class="cb-actions">
         <div class="cb-panel-row">
@@ -2128,6 +2162,7 @@ function cbRenderPlaylistList() {
       <div class="cb-info">
         <div class="cb-name">${escHtml(pl.name)}</div>
         <div class="cb-status">プレイリスト</div>
+        ${pl.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(pl.updatedAt)}</div>` : ''}
       </div>
       <div class="cb-actions">
         <div class="cb-panel-row">
@@ -2322,7 +2357,8 @@ async function cbYtAdd() {
     const ch = await cbResolveYouTubeChannel(input);
     if (!cbFavorites.youtube.some(c => c.channelId === ch.channelId)) {
       const active = cbActiveGroup.youtube;
-      ch.groupId = (active && active !== 'none') ? active : null;
+      ch.groupId   = (active && active !== 'none') ? active : null;
+      ch.updatedAt = Date.now();
       cbFavorites.youtube.push(ch);
       cbSave();
     }
@@ -2406,7 +2442,10 @@ document.getElementById('cb-yt-refresh-icon').addEventListener('click', async ()
 
   const thumbs = await cbFetchYouTubeThumbnails(cbFavorites.youtube.map(ch => ch.channelId));
   cbFavorites.youtube.forEach((ch, i) => {
-    if (thumbs[ch.channelId] !== undefined) cbFavorites.youtube[i].thumbnailUrl = thumbs[ch.channelId];
+    if (thumbs[ch.channelId] !== undefined) {
+      cbFavorites.youtube[i].thumbnailUrl = thumbs[ch.channelId];
+      cbFavorites.youtube[i].updatedAt    = Date.now();
+    }
   });
 
   cbSave();
@@ -2472,7 +2511,7 @@ async function cbTwAdd() {
     }
     const active  = cbActiveGroup.twitch;
     const groupId = (active && active !== 'none') ? active : null;
-    cbFavorites.twitch.push({ username, thumbnailUrl, groupId });
+    cbFavorites.twitch.push({ username, thumbnailUrl, groupId, updatedAt: Date.now() });
     cbSave();
   }
   document.getElementById('cb-tw-input').value = '';
@@ -2498,6 +2537,7 @@ async function cbPlaylistAdd() {
   try {
     const pl = await cbResolvePlaylist(input);
     if (!cbFavorites.playlists.some(p => p.playlistId === pl.playlistId)) {
+      pl.updatedAt = Date.now();
       cbFavorites.playlists.push(pl);
       cbSave();
     }
@@ -2590,7 +2630,10 @@ document.getElementById('cb-tw-refresh').addEventListener('click', async () => {
   await Promise.all(cbFavorites.twitch.map(async (ch, i) => {
     try {
       const url = await cbFetchTwitchThumbnail(ch.username);
-      if (url) cbFavorites.twitch[i].thumbnailUrl = url;
+      if (url) {
+        cbFavorites.twitch[i].thumbnailUrl = url;
+        cbFavorites.twitch[i].updatedAt    = Date.now();
+      }
     } catch (err) {
       authErr = authErr ?? err;
     }
@@ -2834,6 +2877,7 @@ try {
 
 // 起動時にお気に入りをロード
 cbLoad();
+cbRenderStampDictList();
 
 // ===== チャンネル共有（PC → Android） =====
 
@@ -2910,8 +2954,9 @@ document.getElementById('stamp-dict-file').addEventListener('change', async (e) 
   e.target.value = '';
   if (!file) return;
   try {
-    const { channelCount, entryCount } = await importStampDictionaryFile(file);
-    setStatus(`スタンプ辞書を読み込みました（${channelCount}チャンネル・${entryCount}件）`, 'ok');
+    const { channelCount, entryCount, skippedCount } = await importStampDictionaryFile(file);
+    const skipMsg = skippedCount ? `、${skippedCount}チャンネルはローカルの方が新しいためスキップ` : '';
+    setStatus(`スタンプ辞書を読み込みました（${channelCount}チャンネル・${entryCount}件${skipMsg}）`, 'ok');
   } catch (err) {
     setStatus(`スタンプ辞書の読み込みに失敗しました: ${err.message}`, 'error');
   }
