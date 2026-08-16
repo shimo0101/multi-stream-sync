@@ -105,9 +105,15 @@ function createPanelHTML(idx) {
           <button id="btn-zap-prev-${idx}" class="btn btn--secondary" title="前の動画へ">◀ 前へ</button>
           <span id="zap-pos-${idx}" class="zap-pos"></span>
           <button id="btn-zap-next-${idx}" class="btn btn--secondary" title="次の動画へ">次へ ▶</button>
+          <button id="btn-zap-pick-${idx}" class="btn btn--secondary" title="一覧から選ぶ">📋 一覧</button>
           <button id="btn-zap-refresh-${idx}" class="btn btn--secondary" title="プレイリストを再取得">🔄</button>
           <button id="btn-zap-exit-${idx}" class="btn btn--secondary" title="リスト読み込みモードを終了">✕</button>
         </div>
+        <div class="config-row zap-pick-row" id="zap-pick-row-${idx}" hidden>
+          <select id="zap-pick-select-${idx}" class="zap-pick-select"></select>
+          <button id="btn-zap-thumb-${idx}" class="btn btn--secondary" title="サムネイル付き一覧に切り替え（画像を読み込みます）">🖼</button>
+        </div>
+        <ul class="zap-thumb-list" id="zap-thumb-list-${idx}" hidden></ul>
         <div class="comments-panel" id="comments-panel-${idx}" hidden>
           <div class="comments-panel-header">
             <span class="comments-panel-title">💬 コメント</span>
@@ -224,6 +230,8 @@ class PanelController {
 
     // リスト読み込みモード（ザッピング）もYouTubeのみ対応。プラットフォーム切替時は必ず解除する
     document.getElementById(`zap-bar-${this.idx}`).hidden = true;
+    document.getElementById(`zap-pick-row-${this.idx}`).hidden = true;
+    document.getElementById(`zap-thumb-list-${this.idx}`).hidden = true;
     if (this.playlistId) {
       this.playlistId     = null;
       this.playlistVideos = [];
@@ -484,6 +492,7 @@ class PanelController {
     document.getElementById(`zap-bar-${this.idx}`).hidden = false;
     this.load(resumeVideoId || videos[0].videoId);
     this.updateZapPosLabel();
+    this.renderZapPickList();
   }
 
   // 設定から復元したリスト読み込みモード（ページ再読み込み直後）は動画一覧をまだ持っていないため、遅延取得する
@@ -494,6 +503,7 @@ class PanelController {
       this.playlistVideos = videos;
       document.getElementById(`zap-bar-${this.idx}`).hidden = false;
       this.updateZapPosLabel();
+      this.renderZapPickList();
     } catch {}
   }
 
@@ -511,11 +521,49 @@ class PanelController {
     if (!len) return;
     const curIdx = this.playlistVideos.findIndex(v => v.videoId === this.loadedId);
     const idx    = curIdx === -1 ? 0 : (curIdx + delta + len) % len;
-    const video  = this.playlistVideos[idx];
-    document.getElementById(`url-${this.idx}`).value = video.videoId;
-    this.load(video.videoId);
-    saveSettings({ [`p${this.idx}Url`]: video.videoId });
+    this.jumpToPlaylistVideo(this.playlistVideos[idx].videoId);
+  }
+
+  // 一覧（ドロップダウン／サムネイル一覧）から直接選んだ動画へジャンプする
+  pickPlaylistVideo(videoId) {
+    if (!this.playlistVideos.some(v => v.videoId === videoId)) return;
+    this.jumpToPlaylistVideo(videoId);
+  }
+
+  jumpToPlaylistVideo(videoId) {
+    document.getElementById(`url-${this.idx}`).value = videoId;
+    this.load(videoId);
+    saveSettings({ [`p${this.idx}Url`]: videoId });
     this.updateZapPosLabel();
+    this.renderZapPickList();
+  }
+
+  // 一覧選択ドロップダウン（番号+タイトルのみ、サムネイルは読み込まない軽量版）を再構築する。
+  // サムネイル一覧が開いている場合はそちらも合わせて再構築する
+  renderZapPickList() {
+    const select = document.getElementById(`zap-pick-select-${this.idx}`);
+    if (!select) return;
+    select.innerHTML = this.playlistVideos.map((v, i) =>
+      `<option value="${escHtml(v.videoId)}">${i + 1}. ${escHtml(v.title)}</option>`
+    ).join('');
+    if (this.loadedId) select.value = this.loadedId;
+
+    const thumbList = document.getElementById(`zap-thumb-list-${this.idx}`);
+    if (thumbList && !thumbList.hidden) this.renderZapThumbList();
+  }
+
+  // サムネイル付き一覧（🖼ボタンで開いたときだけ構築＝画像はここで初めて読み込まれる）
+  renderZapThumbList() {
+    const list = document.getElementById(`zap-thumb-list-${this.idx}`);
+    if (!list) return;
+    list.innerHTML = this.playlistVideos.map((v, i) => `
+      <li class="zap-thumb-item${v.videoId === this.loadedId ? ' is-current' : ''}" data-video-id="${escHtml(v.videoId)}">
+        ${v.thumbnailUrl
+          ? `<img class="zap-thumb-img" src="${escHtml(v.thumbnailUrl)}" alt="" loading="lazy">`
+          : `<div class="zap-thumb-img zap-thumb-noimg"></div>`}
+        <span class="zap-thumb-title">${i + 1}. ${escHtml(v.title)}</span>
+      </li>
+    `).join('');
   }
 
   // プレイリストの動画一覧を再取得する（YouTube側で中身を編集した場合に反映させるため）
@@ -527,6 +575,7 @@ class PanelController {
       if (!videos.length) { setStatus(`P${this.idx + 1}: プレイリストに動画が見つかりませんでした`, 'error'); return; }
       this.playlistVideos = videos;
       this.updateZapPosLabel();
+      this.renderZapPickList();
       setStatus(`P${this.idx + 1}: プレイリストを更新しました（${videos.length}件）`, 'ok');
     } catch (err) {
       setStatus(`P${this.idx + 1}: プレイリストの再取得に失敗しました: ${err.message}`, 'error');
@@ -538,6 +587,8 @@ class PanelController {
     this.playlistId     = null;
     this.playlistVideos = [];
     document.getElementById(`zap-bar-${this.idx}`).hidden = true;
+    document.getElementById(`zap-pick-row-${this.idx}`).hidden = true;
+    document.getElementById(`zap-thumb-list-${this.idx}`).hidden = true;
     saveSettings({ [`p${this.idx}PlaylistId`]: '' });
   }
 
@@ -891,6 +942,29 @@ function bindPanelEvents(idx) {
   document.getElementById(`btn-zap-next-${idx}`).addEventListener('click', () => panels[idx].zapPlaylist(1));
   document.getElementById(`btn-zap-refresh-${idx}`).addEventListener('click', () => panels[idx].refreshPlaylist());
   document.getElementById(`btn-zap-exit-${idx}`).addEventListener('click', () => panels[idx].exitPlaylistMode());
+
+  // 一覧から直接選ぶ（📋）: ドロップダウン行の開閉
+  document.getElementById(`btn-zap-pick-${idx}`).addEventListener('click', () => {
+    const row     = document.getElementById(`zap-pick-row-${idx}`);
+    const opening = row.hidden;
+    row.hidden = !opening;
+    if (opening) panels[idx].renderZapPickList();
+  });
+  document.getElementById(`zap-pick-select-${idx}`).addEventListener('change', (e) => {
+    panels[idx].pickPlaylistVideo(e.target.value);
+  });
+
+  // サムネイル付き一覧（🖼）: 押したときだけ画像を読み込む
+  document.getElementById(`btn-zap-thumb-${idx}`).addEventListener('click', () => {
+    const list    = document.getElementById(`zap-thumb-list-${idx}`);
+    const opening = list.hidden;
+    list.hidden = !opening;
+    if (opening) panels[idx].renderZapThumbList();
+  });
+  document.getElementById(`zap-thumb-list-${idx}`).addEventListener('click', (e) => {
+    const item = e.target.closest('.zap-thumb-item');
+    if (item) panels[idx].pickPlaylistVideo(item.dataset.videoId);
+  });
 }
 
 // ===== ドラッグ並び替え =====
@@ -2062,11 +2136,20 @@ async function cbFetchPlaylistVideos(playlistId) {
   vUrl.searchParams.set('part', 'snippet');
   vUrl.searchParams.set('id', videoIds.join(','));
   vUrl.searchParams.set('key', apiKey);
-  const vData     = await cbFetchJsonWithRetry(vUrl);
-  const titleById = new Map((vData?.items ?? []).map(v => [v.id, v.snippet.title]));
+  const vData        = await cbFetchJsonWithRetry(vUrl);
+  // サムネイルは既に取得済みのsnippetに含まれているため追加のAPI呼び出しは発生しない。
+  // 実際の画像読み込み（＝ネットワーク負荷）はサムネイル付き一覧を開いたときだけ発生する
+  const snippetById = new Map((vData?.items ?? []).map(v => [v.id, v.snippet]));
 
   // videos.list側の順序はplaylistItemsと一致しない場合があるため、再生順はvideoIds側を正とする
-  return videoIds.map(id => ({ videoId: id, title: titleById.get(id) ?? id }));
+  return videoIds.map(id => {
+    const snippet = snippetById.get(id);
+    return {
+      videoId:      id,
+      title:        snippet?.title ?? id,
+      thumbnailUrl: snippet?.thumbnails?.default?.url ?? snippet?.thumbnails?.medium?.url ?? '',
+    };
+  });
 }
 
 // パネル選択ボタンを生成（現在存在するパネル数に応じて）

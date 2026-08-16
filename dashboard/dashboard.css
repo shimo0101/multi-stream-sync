@@ -385,6 +385,57 @@ body {
 .zap-pos { font-size: 12px; color: #9ca3af; white-space: nowrap; min-width: 34px; text-align: center; }
 /* .config-rowのdisplay:flexが[hidden]のUAデフォルト(display:none)より詳細度で勝ってしまうため明示的に上書きする */
 .zap-bar[hidden] { display: none; }
+.zap-pick-row[hidden] { display: none; }
+
+.zap-pick-select {
+  flex: 1;
+  min-width: 0;
+  background: #1a1a2a;
+  border: 1px solid #3a3a5a;
+  border-radius: 5px;
+  color: #e0e0e0;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+/* サムネイル付き一覧（🖼ボタンを押したときだけ構築・画像読み込みされる） */
+.zap-thumb-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #14141e;
+  border-bottom: 1px solid #2a2a3a;
+}
+.zap-thumb-list[hidden] { display: none; }
+.zap-thumb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.zap-thumb-item:hover { background: #1e1e2e; }
+.zap-thumb-item.is-current { background: #2a1a4a; }
+.zap-thumb-img {
+  width: 48px;
+  height: 27px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: #2a2a3a;
+}
+.zap-thumb-noimg { }
+.zap-thumb-title {
+  font-size: 12px;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 
 /* ===== Player Area ===== */
 .player-wrap {
