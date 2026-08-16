@@ -1269,6 +1269,11 @@ document.getElementById('sel-sync-ref').addEventListener('change', (e) => {
   saveSettings({ syncRefIdx });
 });
 
+// シーク後、再生を再開するまでの待機時間。シークすると再バッファリングが入るため、
+// 同期先だけでなく基準側も同じだけシーク→一時停止させて足並みを揃え、
+// 双方の再バッファリングが落ち着いた頃合いで同時に再生を再開してラグによるズレを抑える
+const SYNC_RESUME_DELAY_MS = 1200;
+
 // 同期ボタン
 document.getElementById('btn-sync').addEventListener('click', () => {
   const refPanel = panels[syncRefIdx];
@@ -1284,7 +1289,7 @@ document.getElementById('btn-sync').addEventListener('click', () => {
   }
 
   const realTimeSecs = refPanel.startTimeSecs + refPos;
-  let synced = 0;
+  const targets = [];
   const skipped = [];
 
   panels.forEach((p, i) => {
@@ -1293,16 +1298,31 @@ document.getElementById('btn-sync').addEventListener('click', () => {
     if (p.startTimeSecs == null)   { skipped.push(`P${i+1}時刻未設定`); return; }
     const targetPos = realTimeSecs - p.startTimeSecs;
     if (targetPos < 0)             { skipped.push(`P${i+1}時刻前`); return; }
-    p.player.seekTo(targetPos);
-    synced++;
+    targets.push({ panel: p, targetPos });
   });
 
   const suffix = skipped.length ? `（スキップ: ${skipped.join(', ')}）` : '';
-  if (synced > 0) {
-    setStatus(`P${syncRefIdx + 1} 基準で ${synced} パネルを同期しました${suffix}`, 'ok');
-  } else {
+  if (targets.length === 0) {
     setStatus(`同期できるパネルがありませんでした ${suffix}`, 'error');
+    return;
   }
+
+  // 基準側もシークし直すことで、同期先と同じタイミングで再バッファリングを発生させる
+  // （基準側だけ再生し続けると、その間に同期先が読み込みで遅れた分がそのままズレになる）
+  refPanel.player.pause();
+  refPanel.player.seekTo(refPos);
+  targets.forEach(({ panel, targetPos }) => {
+    panel.player.pause();
+    panel.player.seekTo(targetPos);
+  });
+
+  setStatus(`P${syncRefIdx + 1} 基準で ${targets.length} パネルを同期中…`);
+
+  setTimeout(() => {
+    refPanel.player.play();
+    targets.forEach(({ panel }) => panel.player.play());
+    setStatus(`P${syncRefIdx + 1} 基準で ${targets.length} パネルを同期しました${suffix}`, 'ok');
+  }, SYNC_RESUME_DELAY_MS);
 });
 
 // 全読込ボタン
