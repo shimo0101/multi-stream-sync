@@ -123,6 +123,7 @@ function createPanelHTML(idx) {
         <canvas id="canvas-${idx}" class="comment-layer" aria-hidden="true"></canvas>
         <div id="player-shield-${idx}" class="player-shield" hidden></div>
         <button id="btn-mute-${idx}" class="btn--mute" title="ミュート">🔊</button>
+        ${!isIOS ? `<button id="btn-mute-quick-${idx}" class="btn--mute-quick" title="ミュート">🔊</button>` : ''}
         <div class="volume-bar" id="vol-bar-${idx}" hidden>
           <input type="range" class="volume-range" id="vol-range-${idx}"
                  min="0" max="100" step="1" value="100">
@@ -172,7 +173,9 @@ class PanelController {
       panels.forEach((p, i) => { if (i !== this.idx) p.setMuted(true); });
     }
     this.isMuted = muted;
-    const btn = document.getElementById(`btn-mute-${this.idx}`);
+    // iOS: 既存の🔊ボタン自体がミュートボタン。PC/Android: 隣に新設したミュート専用ボタン側を更新
+    // （既存の🔊ボタンは音量スライダー開閉トグルのまま変更しない）
+    const btn = document.getElementById(isIOS ? `btn-mute-${this.idx}` : `btn-mute-quick-${this.idx}`);
     if (btn) {
       btn.textContent = muted ? '🔇' : '🔊';
       btn.classList.toggle('is-muted', muted);
@@ -754,6 +757,10 @@ function bindPanelEvents(idx) {
   } else {
     _muteBtn.textContent = '🔊';
     _muteBtn.title = '音量調整';
+    // 隣に新設したミュート専用ボタン（既存の🔊ボタンとは独立。音量スライダーは開閉しない）
+    document.getElementById(`btn-mute-quick-${idx}`).addEventListener('click', () => {
+      panels[idx].setMuted(!panels[idx].isMuted);
+    });
     _muteBtn.addEventListener('click', () => {
       const volBar   = document.getElementById(`vol-bar-${idx}`);
       const nudgeBar = document.getElementById(`nudge-bar-${idx}`);
