@@ -2055,36 +2055,38 @@ function cbRenderYtList() {
     : '';
   list.innerHTML = sortBar + view.map((ch, vi) => `
     <li class="cb-item${ch.liveVideoId ? ' is-live' : ''}${cbEditMode.youtube ? ' is-editing' : ''}">
-      ${ch.thumbnailUrl
-        ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
-        : `<div class="cb-avatar-initial" style="background:#cc0000">${escHtml(ch.name[0] ?? '?')}</div>`
-      }
-      <div class="cb-info">
-        <div class="cb-name">${escHtml(ch.name)}</div>
-        <div class="cb-status">
-          ${ch.liveVideoId
-            ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
-            : '配信なし'}
+      <div class="cb-row">
+        ${ch.thumbnailUrl
+          ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
+          : `<div class="cb-avatar-initial" style="background:#cc0000">${escHtml(ch.name[0] ?? '?')}</div>`
+        }
+        <div class="cb-info">
+          <div class="cb-name">${escHtml(ch.name)}</div>
+          <div class="cb-status">
+            ${ch.liveVideoId
+              ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
+              : '配信なし'}
+          </div>
         </div>
-        ${ch.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(ch.updatedAt)}</div>` : ''}
-      </div>
-      <div class="cb-actions">
-        <div class="cb-panel-row">
-          ${panels.map((_, pi) =>
-            `<button class="cb-open-btn" data-cb-yt-open="${ch.origIdx}" data-panel="${pi}"
-                     ${ch.liveVideoId ? '' : 'disabled'}>P${pi + 1}</button>`
-          ).join('')}
+        <div class="cb-actions">
+          <div class="cb-panel-row">
+            ${panels.map((_, pi) =>
+              `<button class="cb-open-btn" data-cb-yt-open="${ch.origIdx}" data-panel="${pi}"
+                       ${ch.liveVideoId ? '' : 'disabled'}>P${pi + 1}</button>`
+            ).join('')}
+          </div>
+          ${cbEditMode.youtube ? `
+          <select class="cb-group-select" data-cb-yt-group-move="${ch.origIdx}">
+            ${cbGroupOptionsHtml('youtube', ch.groupId)}
+          </select>
+          ${!cbYtLiveSorted ? `
+          <div class="cb-reorder-row">
+            <button class="cb-reorder-btn" data-cb-yt-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
+            <button class="cb-reorder-btn" data-cb-yt-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
+          </div>` : ''}` : ''}
         </div>
-        ${cbEditMode.youtube ? `
-        <select class="cb-group-select" data-cb-yt-group-move="${ch.origIdx}">
-          ${cbGroupOptionsHtml('youtube', ch.groupId)}
-        </select>
-        ${!cbYtLiveSorted ? `
-        <div class="cb-reorder-row">
-          <button class="cb-reorder-btn" data-cb-yt-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
-          <button class="cb-reorder-btn" data-cb-yt-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
-        </div>` : ''}` : ''}
       </div>
+      ${ch.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(ch.updatedAt)}</div>` : ''}
       ${cbEditMode.youtube ? `<button class="cb-del-btn cb-item-del" data-cb-yt-del="${ch.origIdx}">✕</button>` : ''}
     </li>
   `).join('');
@@ -2109,35 +2111,37 @@ function cbRenderTwList() {
     : '';
   list.innerHTML = sortBar + view.map((ch, vi) => `
     <li class="cb-item${ch.isLive ? ' is-live' : ''}${cbEditMode.twitch ? ' is-editing' : ''}">
-      ${ch.thumbnailUrl
-        ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
-        : `<div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>`
-      }
-      <div class="cb-info">
-        <div class="cb-name">${escHtml(ch.username)}</div>
-        <div class="cb-status">
-          ${ch.isLive
-            ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
-            : 'Twitch'}
+      <div class="cb-row">
+        ${ch.thumbnailUrl
+          ? `<img class="cb-avatar" src="${escHtml(ch.thumbnailUrl)}" alt="">`
+          : `<div class="cb-avatar-initial" style="background:#6441a5">${escHtml(ch.username[0].toUpperCase())}</div>`
+        }
+        <div class="cb-info">
+          <div class="cb-name">${escHtml(ch.username)}</div>
+          <div class="cb-status">
+            ${ch.isLive
+              ? `<span class="cb-live-badge">LIVE</span>${escHtml(ch.liveTitle ?? '')}`
+              : 'Twitch'}
+          </div>
         </div>
-        ${ch.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(ch.updatedAt)}</div>` : ''}
-      </div>
-      <div class="cb-actions">
-        <div class="cb-panel-row">
-          ${panels.map((_, pi) =>
-            `<button class="cb-open-btn" data-cb-tw-open="${ch.origIdx}" data-panel="${pi}">P${pi + 1}</button>`
-          ).join('')}
+        <div class="cb-actions">
+          <div class="cb-panel-row">
+            ${panels.map((_, pi) =>
+              `<button class="cb-open-btn" data-cb-tw-open="${ch.origIdx}" data-panel="${pi}">P${pi + 1}</button>`
+            ).join('')}
+          </div>
+          ${cbEditMode.twitch ? `
+          <select class="cb-group-select" data-cb-tw-group-move="${ch.origIdx}">
+            ${cbGroupOptionsHtml('twitch', ch.groupId)}
+          </select>
+          ${!cbTwLiveSorted ? `
+          <div class="cb-reorder-row">
+            <button class="cb-reorder-btn" data-cb-tw-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
+            <button class="cb-reorder-btn" data-cb-tw-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
+          </div>` : ''}` : ''}
         </div>
-        ${cbEditMode.twitch ? `
-        <select class="cb-group-select" data-cb-tw-group-move="${ch.origIdx}">
-          ${cbGroupOptionsHtml('twitch', ch.groupId)}
-        </select>
-        ${!cbTwLiveSorted ? `
-        <div class="cb-reorder-row">
-          <button class="cb-reorder-btn" data-cb-tw-up="${ch.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
-          <button class="cb-reorder-btn" data-cb-tw-down="${ch.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
-        </div>` : ''}` : ''}
       </div>
+      ${ch.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(ch.updatedAt)}</div>` : ''}
       ${cbEditMode.twitch ? `<button class="cb-del-btn cb-item-del" data-cb-tw-del="${ch.origIdx}">✕</button>` : ''}
     </li>
   `).join('');
@@ -2155,27 +2159,29 @@ function cbRenderPlaylistList() {
   const last = view.length - 1;
   list.innerHTML = view.map((pl, vi) => `
     <li class="cb-item${cbEditMode.playlists ? ' is-editing' : ''}">
-      ${pl.thumbnailUrl
-        ? `<img class="cb-avatar" src="${escHtml(pl.thumbnailUrl)}" alt="">`
-        : `<div class="cb-avatar-initial" style="background:#7c3aed">${escHtml(pl.name[0] ?? '?')}</div>`
-      }
-      <div class="cb-info">
-        <div class="cb-name">${escHtml(pl.name)}</div>
-        <div class="cb-status">プレイリスト</div>
-        ${pl.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(pl.updatedAt)}</div>` : ''}
-      </div>
-      <div class="cb-actions">
-        <div class="cb-panel-row">
-          ${panels.map((_, pi) =>
-            `<button class="cb-open-btn" data-cb-pl-open="${pl.origIdx}" data-panel="${pi}">P${pi + 1}</button>`
-          ).join('')}
+      <div class="cb-row">
+        ${pl.thumbnailUrl
+          ? `<img class="cb-avatar" src="${escHtml(pl.thumbnailUrl)}" alt="">`
+          : `<div class="cb-avatar-initial" style="background:#7c3aed">${escHtml(pl.name[0] ?? '?')}</div>`
+        }
+        <div class="cb-info">
+          <div class="cb-name">${escHtml(pl.name)}</div>
+          <div class="cb-status">プレイリスト</div>
         </div>
-        ${cbEditMode.playlists ? `
-        <div class="cb-reorder-row">
-          <button class="cb-reorder-btn" data-cb-pl-up="${pl.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
-          <button class="cb-reorder-btn" data-cb-pl-down="${pl.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
-        </div>` : ''}
+        <div class="cb-actions">
+          <div class="cb-panel-row">
+            ${panels.map((_, pi) =>
+              `<button class="cb-open-btn" data-cb-pl-open="${pl.origIdx}" data-panel="${pi}">P${pi + 1}</button>`
+            ).join('')}
+          </div>
+          ${cbEditMode.playlists ? `
+          <div class="cb-reorder-row">
+            <button class="cb-reorder-btn" data-cb-pl-up="${pl.origIdx}" ${vi === 0    ? 'disabled' : ''}>↑</button>
+            <button class="cb-reorder-btn" data-cb-pl-down="${pl.origIdx}" ${vi === last ? 'disabled' : ''}>↓</button>
+          </div>` : ''}
+        </div>
       </div>
+      ${pl.updatedAt ? `<div class="cb-updated">更新: ${cbFormatDate(pl.updatedAt)}</div>` : ''}
       ${cbEditMode.playlists ? `<button class="cb-del-btn cb-item-del" data-cb-pl-del="${pl.origIdx}">✕</button>` : ''}
     </li>
   `).join('');

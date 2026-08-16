@@ -586,8 +586,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .cb-item {
   position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  flex-direction: column;
   background: #1a1a2a;
   border: 1px solid #2a2a3a;
   border-radius: 8px;
@@ -597,6 +596,7 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 /* 編集モード時: 削除ボタン(✕)は誤タップ防止のため↑↓から離し、カード右上に単独配置する */
 .cb-item.is-editing { padding-right: 32px; }
 .cb-item-del { position: absolute; top: 6px; right: 6px; }
+.cb-row { display: flex; align-items: flex-start; gap: 8px; }
 
 .cb-avatar {
   width: 36px;
@@ -639,7 +639,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .cb-updated {
   font-size: 10px;
   color: #4b5563;
-  margin-top: 1px;
+  margin-top: 3px;
+  margin-left: 44px; /* アバター36px + gap8px 分インデントし、名前の下に揃える */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -959,9 +960,11 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   .cb-header    { padding: 8px 12px; }
   .cb-tab       { padding: 6px 8px; font-size: 12px; }
   .cb-pane      { overflow-x: hidden; padding: 8px; gap: 6px; }
-  .cb-item      { padding: 6px 8px; gap: 6px; }
+  .cb-item      { padding: 6px 8px; }
+  .cb-row       { gap: 6px; }
   .cb-avatar, .cb-avatar-initial { width: 28px; height: 28px; }
   .cb-avatar-initial { font-size: 12px; }
+  .cb-updated   { margin-left: 34px; }
   /* アクション列を固定幅にして info 列が過剰に広がるのを防ぐ */
   .cb-actions   { width: 76px; flex-shrink: 0; }
   /* P1〜P4 を 2列グリッドに固定して横幅を抑える */
