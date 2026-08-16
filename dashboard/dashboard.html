@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="../icons/icon-96.png">
   <link rel="manifest" href="pwa.webmanifest">
   <title>MultiStream Sync</title>
-  <link rel="stylesheet" href="dashboard.css?v=55">
+  <link rel="stylesheet" href="dashboard.css?v=56">
 </head>
 <body>
 
@@ -63,14 +63,15 @@
         <input type="text" id="tw-client-id" class="input input--sm"
                placeholder="dev.twitch.tv で取得" autocomplete="off">
       </div>
-      <div class="settings-item">
+      <div class="settings-item settings-item--stamp-dict">
         <label class="config-label">スタンプ辞書</label>
         <div class="settings-item-row">
           <button id="btn-stamp-dict-export" class="btn btn--secondary" title="スタンプ辞書をJSONファイルとして書き出す">書き出す</button>
           <button id="btn-stamp-dict-import" class="btn btn--secondary" title="書き出したJSONファイルを読み込んでマージする（ローカルより新しいチャンネルのみ反映）">読み込む</button>
           <input type="file" id="stamp-dict-file" accept=".json,application/json" hidden>
+          <button id="btn-stamp-dict-toggle" class="btn btn--secondary stamp-dict-toggle-btn" title="登録チャンネル一覧の表示を切り替え">▶ 一覧</button>
         </div>
-        <ul id="stamp-dict-list" class="stamp-dict-list"></ul>
+        <ul id="stamp-dict-list" class="stamp-dict-list" hidden></ul>
       </div>
       <div class="settings-item">
         <label class="config-label">表示モード</label>
@@ -173,6 +174,6 @@
   <!-- チャンネルブラウザ バックドロップ（モバイルのみ表示） -->
   <div class="cb-backdrop" id="cb-backdrop"></div>
 
-  <script type="module" src="dashboard.js?v=56"></script>
+  <script type="module" src="dashboard.js?v=57"></script>
 </body>
 </html>

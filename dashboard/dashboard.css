@@ -176,6 +176,10 @@ body {
 .settings-item .input { flex: 1; min-width: 0; }
 .settings-item-row { display: flex; gap: 8px; flex: 1; min-width: 0; }
 
+/* スタンプ辞書欄: ボタン行の下に一覧を独立した行として表示するため縦積みにする */
+.settings-item--stamp-dict { flex-wrap: wrap; row-gap: 6px; }
+.settings-item--stamp-dict .stamp-dict-list { flex: 1 1 100%; width: 100%; }
+
 .settings-note {
   margin-top: 8px;
   font-size: 11px;
@@ -661,10 +665,17 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
   border-bottom: 1px solid #2a2a2a;
 }
 .stamp-dict-name {
+  flex: 1 1 auto;
+  min-width: 0;
   color: #e0e0e0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.stamp-dict-toggle-btn {
+  font-size: 11px;
+  padding: 5px 8px;
+  white-space: nowrap;
 }
 .stamp-dict-meta {
   color: #6b7280;

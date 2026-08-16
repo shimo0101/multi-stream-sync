@@ -1718,11 +1718,17 @@ async function importStampDictionaryFile(file) {
 }
 
 // スタンプ辞書のチャンネルごとの最終更新日を、共通設定パネルに一覧表示する
+// 一覧自体は既定で折りたたみ（トグルボタンの件数表示のみで概況を把握できる）
 function cbRenderStampDictList() {
-  const el = document.getElementById('stamp-dict-list');
+  const el  = document.getElementById('stamp-dict-list');
+  const btn = document.getElementById('btn-stamp-dict-toggle');
   if (!el) return;
   const dict = loadStampDictionary();
   const rows = Object.entries(dict).sort(([, a], [, b]) => (b.at ?? 0) - (a.at ?? 0));
+  if (btn) {
+    const arrow = el.hidden ? '▶' : '▼';
+    btn.textContent = rows.length ? `${arrow} 一覧（${rows.length}件）` : `${arrow} 一覧`;
+  }
   if (!rows.length) {
     el.innerHTML = '<li class="stamp-dict-empty">まだ登録されたスタンプはありません</li>';
     return;
@@ -1734,6 +1740,13 @@ function cbRenderStampDictList() {
            `<span class="stamp-dict-meta">${count}件・更新: ${cbFormatDate(entry.at)}</span></li>`;
   }).join('');
 }
+
+// スタンプ辞書一覧の折りたたみ切り替え
+document.getElementById('btn-stamp-dict-toggle').addEventListener('click', () => {
+  const el = document.getElementById('stamp-dict-list');
+  el.hidden = !el.hidden;
+  cbRenderStampDictList();
+});
 
 // テキスト中の ":shortcut:" パターンを、指定チャンネルの辞書と照合してスタンプ画像に置き換える。
 // 該当が無ければテキストのまま（従来通り）
