@@ -282,6 +282,17 @@ class PanelController {
                         : 'rgba(255,255,255,0.82)';
             // アーカイブ解析で記録済みのスタンプがあれば、テキスト中の:shortcut:を画像に置き換える
             const { text: displayText, stamps } = applyKnownStamps(text, this.liveChatChannelId);
+            if (window.__debugStampMatch) {
+              const shortcuts = text.match(/:[^\s:]+:/g) ?? [];
+              const dictEntries = this.liveChatChannelId ? loadStampDictionary()[this.liveChatChannelId]?.entries ?? {} : {};
+              console.log('[stamp-debug]', {
+                rawText: text,
+                liveChatChannelId: this.liveChatChannelId,
+                shortcutsFoundInText: shortcuts,
+                dictKeysForChannel: Object.keys(dictEntries),
+                matchedStamps: stamps,
+              });
+            }
             this.overlay.addComment(displayText, { color, avatarUrl: avatarUrl ?? null, stamps });
           },
           onError:        (msg) => setStatus(`P${this.idx + 1} YouTube チャットエラー: ${msg}`, 'error'),
