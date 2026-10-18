@@ -128,6 +128,7 @@ function createPanelHTML(idx) {
         <div id="player-${idx}" class="player-target"></div>
         <canvas id="canvas-${idx}" class="comment-layer" aria-hidden="true"></canvas>
         <div id="player-shield-${idx}" class="player-shield" hidden></div>
+        <button id="btn-screen-${idx}" class="btn--screen-mode" title="画面を縮小（音声のみ再生に近づける）">👁</button>
         <button id="btn-mute-${idx}" class="btn--mute" title="ミュート">🔊</button>
         ${!isIOS ? `<button id="btn-mute-quick-${idx}" class="btn--mute-quick" title="ミュート">🔊</button>` : ''}
         <div class="volume-bar" id="vol-bar-${idx}" hidden>
@@ -165,6 +166,7 @@ class PanelController {
     this.liveChatChannelId = null; // ライブチャット表示中の動画の投稿チャンネルID（スタンプ辞書の照合に使用）
     this.playlistId     = null; // リスト読み込みモード中のプレイリストID（YouTubeのみ対応）
     this.playlistVideos = [];   // [{videoId, title}]（再生順）。ザッピングの前へ/次へで参照する
+    this.screenMode     = 'normal'; // 'normal' | 'shrink' | 'hidden'（画面を縮小/非表示にして音声のみ再生する機能）
     this.overlay       = new CommentOverlay(document.getElementById(`canvas-${idx}`));
 
     this._ytPlayer = null;
@@ -703,6 +705,63 @@ function applyLayout(layoutId) {
   currentLayout = layoutId;
   document.getElementById('sel-layout').value = layoutId;
   saveSettings({ layout: layoutId });
+  refreshStageTemplate();
+}
+
+// ===== 画面の縮小/非表示（音声のみ再生） =====
+// 👁 通常 → 🔈 縮小表示 → 🙈 非表示（他パネルへスペースを譲る） → 👁 通常 … の3状態トグル。
+// 非表示を選んでも動画の再生自体は止まらない（display:none後もgetCurrentTime()が進み続けることを実機確認済み）。
+
+function cycleScreenMode(idx) {
+  const order = { normal: 'shrink', shrink: 'hidden', hidden: 'normal' };
+  panels[idx].screenMode = order[panels[idx].screenMode] ?? 'normal';
+  applyScreenMode(idx);
+}
+
+function applyScreenMode(idx) {
+  const panel = document.getElementById(`panel-${idx}`);
+  const mode  = panels[idx].screenMode;
+  panel.classList.toggle('is-screen-shrink', mode === 'shrink');
+  panel.classList.toggle('is-screen-hidden', mode === 'hidden');
+
+  const btn = document.getElementById(`btn-screen-${idx}`);
+  if (btn) {
+    btn.textContent = mode === 'hidden' ? '🙈' : mode === 'shrink' ? '🔈' : '👁';
+    btn.title = mode === 'hidden' ? '非表示中（音声のみ再生）。クリックで元に戻す'
+              : mode === 'shrink' ? '縮小表示中（音声メイン）。クリックで非表示にする'
+              : '画面を縮小（音声のみ再生に近づける）';
+  }
+  refreshStageTemplate();
+}
+
+// 非表示(hidden)のパネルが1つでもあれば、見た目の並び順(visualOrder)に沿って横1列の
+// グリッドへ一時的に切り替える。非表示パネルは36px幅の帯として残し(復元ボタンを兼ねる)、
+// それ以外のパネルが残りのスペースを均等に分け合う。
+// lp3-l/lp3-rなど非対称レイアウトのnth-child配置は、この間だけ一時的に解除される。
+// 非表示が1つも無ければ元のレイアウトCSSクラスにすべて任せる(通常時の見た目は変更なし)。
+function refreshStageTemplate() {
+  const stage = document.getElementById('stage');
+  const anyHidden = panels.some(p => p.screenMode === 'hidden');
+
+  if (!anyHidden) {
+    stage.style.gridTemplateColumns = '';
+    stage.style.gridTemplateRows    = '';
+    panels.forEach((_, i) => {
+      const el = document.getElementById(`panel-${i}`);
+      if (el) { el.style.gridColumn = ''; el.style.gridRow = ''; }
+    });
+    return;
+  }
+
+  const byVisual = [...panels.keys()].sort((a, b) => (visualOrder[a] ?? a) - (visualOrder[b] ?? b));
+  stage.style.gridTemplateColumns = byVisual
+    .map(i => panels[i].screenMode === 'hidden' ? '36px' : '1fr')
+    .join(' ');
+  stage.style.gridTemplateRows = '1fr';
+  panels.forEach((_, i) => {
+    const el = document.getElementById(`panel-${i}`);
+    if (el) { el.style.gridColumn = 'auto'; el.style.gridRow = 'auto'; }
+  });
 }
 
 // ===== 同期基準セレクター =====
@@ -720,6 +779,9 @@ function refreshSyncRefSelector() {
 // ===== イベント バインド（パネル生成後に呼ぶ） =====
 
 function bindPanelEvents(idx) {
+  // 画面の縮小/非表示トグル（音声のみ再生）
+  document.getElementById(`btn-screen-${idx}`).addEventListener('click', () => cycleScreenMode(idx));
+
   // プラットフォームスイッチ
   document.querySelectorAll(`[data-panel="${idx}"] .plat-btn`).forEach(btn => {
     btn.addEventListener('click', () => {
