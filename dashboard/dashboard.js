@@ -726,7 +726,8 @@ function applyScreenMode(idx) {
 
   const btn = document.getElementById(`btn-screen-${idx}`);
   if (btn) {
-    btn.textContent = mode === 'hidden' ? '🙈' : mode === 'shrink' ? '🔈' : '👁';
+    // 🔈等の音量系アイコンは隣接する🔊/🔇ミュートボタンと紛らわしいため使わない
+    btn.textContent = mode === 'hidden' ? '🙈' : mode === 'shrink' ? '🔽' : '👁';
     btn.title = mode === 'hidden' ? '非表示中（音声のみ再生）。クリックで元に戻す'
               : mode === 'shrink' ? '縮小表示中（音声メイン）。クリックで非表示にする'
               : '画面を縮小（音声のみ再生に近づける）';

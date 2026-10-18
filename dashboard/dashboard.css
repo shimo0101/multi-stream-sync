@@ -961,10 +961,13 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 }
 
 /* ===== Mute Button (player overlay) ===== */
+/* 下部はYouTube/Twitch埋め込み側が自前の再生/音量コントロールを表示する領域と重なり
+   押せなくなるため上部に配置する。右上は全画面終了ボタン（画面右上固定、.btn--exit-fullscreen）
+   と衝突し誤操作の懸念があるため、左上（👁ボタンと同じ側）に寄せる（2026-10-18） */
 .btn--mute {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  top: 8px;
+  left: 50px;
   z-index: 20;
   touch-action: manipulation;
   width: 34px;
@@ -990,8 +993,8 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 /* ===== Quick mute Button (PC/Android。既存の🔊＝音量スライダー開閉ボタンとは独立したワンクリックミュート) ===== */
 .btn--mute-quick {
   position: absolute;
-  bottom: 8px;
-  left: 50px; /* 既存の🔊ボタン(left:8px, 34px幅)のすぐ右 */
+  top: 8px;
+  left: 92px; /* 👁ボタン(left:8px)・🔊ボタン(left:50px)のすぐ右隣 */
   z-index: 20;
   touch-action: manipulation;
   width: 34px;
@@ -1017,9 +1020,9 @@ body.is-fullscreen .btn--exit-fullscreen { display: block; }
 .volume-bar[hidden] { display: none; }
 .volume-bar {
   position: absolute;
-  bottom: 8px;
-  left: 92px; /* 🔊ボタン(left:8px)+ミュート専用ボタン(left:50px) の右、34px幅+8pxぶん空ける */
-  right: 50px; /* 右側の同期補正ボタン(⏱)とぶつからないよう空けておく */
+  top: 8px;
+  left: 134px; /* 👁(left:8px)・🔊(left:50px)・🔇(left:92px) の右、34px幅+8pxぶん空ける */
+  right: 8px;
   z-index: 20;
   display: flex;
   align-items: center;
