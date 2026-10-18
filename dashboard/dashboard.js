@@ -1761,13 +1761,18 @@ function trimStampDictionary(dict) {
   }
 }
 
-// アーカイブ解析で見つかったスタンプ（{url, fallbackText}の配列）を、指定チャンネルの辞書にマージする
+// アーカイブ解析で見つかったスタンプ（{url, fallbackText, shortcuts?}の配列）を、指定チャンネルの辞書にマージする
 function registerStamps(channelId, stamps) {
   if (!channelId || !stamps?.length) return;
   const dict  = loadStampDictionary();
   const entry = dict[channelId] ?? { entries: {}, at: 0 };
   for (const s of stamps) {
-    if (s.fallbackText && s.url) entry.entries[s.fallbackText] = s.url;
+    if (!s.url) continue;
+    // shortcuts配列（表記ゆれ全候補）があれば全てを辞書キーとして登録する。
+    // ライブ中に公式APIが実際にどの表記をdisplayMessageへ埋め込むかは不定なため、
+    // 1候補(fallbackText)だけだと一致せず画像置換が効かないケースがあった
+    const keys = s.shortcuts?.length ? s.shortcuts : (s.fallbackText ? [s.fallbackText] : []);
+    for (const key of keys) entry.entries[key] = s.url;
   }
   entry.at = Date.now();
   dict[channelId] = entry;
@@ -1929,9 +1934,12 @@ function extractLiveChatMessage(runs) {
       continue;
     }
     if (r.emoji) {
-      const url      = r.emoji.image?.thumbnails?.[0]?.url ?? null;
-      const shortcut = r.emoji.shortcuts?.[0] ?? r.emoji.emojiId ?? '';
-      if (url) stamps.push({ url, fallbackText: shortcut });
+      const url       = r.emoji.image?.thumbnails?.[0]?.url ?? null;
+      const shortcuts  = r.emoji.shortcuts ?? [];
+      const shortcut   = shortcuts[0] ?? r.emoji.emojiId ?? '';
+      // ライブ中の公式APIがdisplayMessageにどの表記を埋め込むかはshortcuts内で不定なため、
+      // 辞書登録(registerStamps)で全候補をキーにできるようshortcuts配列ごと渡す
+      if (url) stamps.push({ url, fallbackText: shortcut, shortcuts });
       else if (shortcut) text += shortcut;
     }
   }
