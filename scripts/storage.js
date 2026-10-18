@@ -25,6 +25,8 @@ const DEFAULTS = {
   visualOrder: [],
   // PC表示を強制（外部ディスプレイへのミラーリング等で画面幅から自動判定できない場合の手動切り替え）
   forceDesktop: false,
+  // 横画面を強制（XREAL等でスマホ本体が物理的に回転せず全画面表示が縦に固定されてしまう場合の手動切り替え）
+  forceLandscape: false,
 };
 
 const useExtStorage =

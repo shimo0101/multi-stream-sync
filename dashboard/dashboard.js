@@ -4,7 +4,7 @@ import { CommentOverlay }             from '../scripts/comment-overlay.js?v=47';
 import { SyncManager }                from '../scripts/sync-manager.js';
 import { YouTubeChatClient }          from '../scripts/youtube-chat.js';
 import { TwitchChatClient }           from '../scripts/twitch-chat.js';
-import { loadSettings, saveSettings } from '../scripts/storage.js';
+import { loadSettings, saveSettings } from '../scripts/storage.js?v=1';
 
 // ===== グローバル状態 =====
 
@@ -1316,6 +1316,9 @@ async function init() {
   setValue('tw-relay-url', settings.twRelayUrl);
   setValue('tw-client-id', settings.twClientId);
   applyForceDesktop(!!settings.forceDesktop);
+  // 横画面強制ロックはユーザー操作(クリック)なしでは取得できないため、ここではボタンの
+  // 見た目だけ復元する（実際のロックは起動時には行わず、ユーザーに再度ボタンを押してもらう）
+  document.getElementById('btn-force-landscape')?.classList.toggle('is-active', !!settings.forceLandscape);
 
   // 同期基準
   syncRefIdx = Math.min(settings.syncRefIdx ?? 0, (settings.panelCount ?? 2) - 1);
@@ -1617,6 +1620,54 @@ document.getElementById('btn-force-desktop').addEventListener('click', () => {
   applyForceDesktop(settings.forceDesktop);
   saveSettings({ forceDesktop: settings.forceDesktop });
 });
+
+// 横画面を強制: Screen Orientation API で画面回転を横向きに固定する。
+// XREAL等の外部ディスプレイにスマホをミラーリングしている場合、スマホ本体は物理的に
+// 回転しないため、全画面表示が縦のまま固定されてしまうことがある。この固定(lock)は
+// Android Chromeでは全画面表示中でないと失敗するため、有効化時は併せて全画面表示も要求する。
+const btnForceLandscape = document.getElementById('btn-force-landscape');
+
+if (!screen.orientation?.lock) {
+  // Screen Orientation API 非対応のブラウザ（iOS Safari等）では機能しないため非表示
+  btnForceLandscape.hidden = true;
+} else {
+  // 実際にロックできた/できなかった結果をそのままsettings.forceLandscape・ボタンの見た目に反映する
+  // （楽観的にONと表示してしまうと、失敗時にユーザーが「オンになっているのに横にならない」と誤認するため）
+  async function applyForceLandscape(enabled) {
+    if (!enabled) {
+      settings.forceLandscape = false;
+      btnForceLandscape.classList.remove('is-active');
+      try { screen.orientation.unlock?.(); } catch {}
+      return;
+    }
+    try {
+      if (document.fullscreenEnabled && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+      await screen.orientation.lock('landscape');
+      settings.forceLandscape = true;
+      btnForceLandscape.classList.add('is-active');
+    } catch {
+      settings.forceLandscape = false;
+      btnForceLandscape.classList.remove('is-active');
+      setStatus('横画面の固定に失敗しました。全画面表示中に再度お試しください', 'error');
+    }
+  }
+
+  btnForceLandscape.addEventListener('click', async () => {
+    await applyForceLandscape(!settings.forceLandscape);
+    saveSettings({ forceLandscape: settings.forceLandscape });
+  });
+
+  // 全画面表示が解除されるとロック自体がブラウザ側で自動解除されるため、ボタンの見た目も追従させる
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && settings.forceLandscape) {
+      settings.forceLandscape = false;
+      btnForceLandscape.classList.remove('is-active');
+      saveSettings({ forceLandscape: false });
+    }
+  });
+}
 
 init().catch(console.error);
 
