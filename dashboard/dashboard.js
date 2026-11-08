@@ -949,7 +949,7 @@ function bindPanelEvents(idx) {
       if (!panel.loadedId) { setStatus('先に YouTube 動画を読み込んでください', 'error'); return; }
       chat.updateApiKey(document.getElementById('yt-api-key').value.trim());
       // スタンプ辞書の照合用にチャンネルIDを解決する（非同期・チャット開始をブロックしない）
-      resolveChannelIdForVideo(panel.loadedId).then(id => { panel.liveChatChannelId = id; });
+      resolveChannelIdForVideo(panel.loadedId).then(id => { panel.liveChatChannelId = id; preloadStampImages(panel, id); });
       chat.start(panel.loadedId);
     } else {
       if (chat.isConnected()) { chat.disconnect(); return; }
@@ -1499,6 +1499,7 @@ document.getElementById('btn-chat-all').addEventListener('click', () => {
     if (p.platform === 'youtube') {
       if (chat.isRunning() || !p.loadedId) return;
       chat.updateApiKey(document.getElementById('yt-api-key').value.trim());
+      resolveChannelIdForVideo(p.loadedId).then(id => { p.liveChatChannelId = id; preloadStampImages(p, id); });
       chat.start(p.loadedId);
       started++;
     } else {
@@ -1986,12 +1987,20 @@ function applyKnownStamps(text, channelId) {
     const url = entries[match[0]];
     if (url) {
       result += text.slice(lastIndex, match.index);
-      stamps.push({ url, fallbackText: match[0] });
+      // at = 置換後テキスト内でスタンプを描画する位置（本文の途中のスタンプを末尾に寄せないため）
+      stamps.push({ url, fallbackText: match[0], at: result.length });
       lastIndex = re.lastIndex;
     }
   }
   result += text.slice(lastIndex);
   return { text: result, stamps };
+}
+
+// チャット開始時に、そのチャンネルの辞書にあるスタンプ画像を先読みしておく
+// （初回表示時に画像が間に合わず、読み込み中の空白が目立つのを防ぐ）
+function preloadStampImages(panel, channelId) {
+  const entries = channelId ? loadStampDictionary()[channelId]?.entries : null;
+  if (entries) panel.overlay.preloadImages(Object.values(entries));
 }
 
 // 動画IDから投稿チャンネルIDを解決する（セッション内キャッシュあり）
@@ -2042,7 +2051,7 @@ function extractLiveChatMessage(runs) {
       const shortcut   = shortcuts[0] ?? r.emoji.emojiId ?? '';
       // ライブ中の公式APIがdisplayMessageにどの表記を埋め込むかはshortcuts内で不定なため、
       // 辞書登録(registerStamps)で全候補をキーにできるようshortcuts配列ごと渡す
-      if (url) stamps.push({ url, fallbackText: shortcut, shortcuts });
+      if (url) stamps.push({ url, fallbackText: shortcut, shortcuts, at: text.length });
       else if (shortcut) text += shortcut;
     }
   }
@@ -2078,6 +2087,8 @@ function parseLiveChatJsonl(text) {
       const amount    = isPaid ? (renderer.purchaseAmountText?.simpleText ?? '') : '';
       const avatarUrl = renderer.authorPhoto?.thumbnails?.[0]?.url ?? null;
       const displayText = amount ? `[${amount}] ${text_}` : text_;
+      // 金額プレフィックスの分だけスタンプの描画位置をずらす
+      if (amount) for (const st of stamps) st.at += amount.length + 3;
 
       if (!displayText.trim() && !stamps.length) continue; // 本文・スタンプとも無ければ表示しない
 

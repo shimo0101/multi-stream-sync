@@ -12,6 +12,7 @@ export class CommentOverlay {
   #laneCount = 10;
   #speed = 220; // px/秒
   #imageCache = new Map();
+  #failedImages = new Set(); // 読み込みに失敗した画像URL（フォールバック表示の判定用）
   #lastInLane = []; // 各レーンに最後に追加したコメントへの参照
 
   constructor(canvasElement) {
@@ -45,9 +46,33 @@ export class CommentOverlay {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload  = () => this.#imageCache.set(url, img);
-    img.onerror = () => this.#imageCache.set(url, null);
+    img.onerror = () => { this.#imageCache.set(url, null); this.#failedImages.add(url); };
     img.src = url;
     return null;
+  }
+
+  /** スタンプ画像などを事前に読み込んでおく（チャット開始時に辞書の画像を先読みする用途） */
+  preloadImages(urls) {
+    for (const url of urls ?? []) if (url) this.#getImage(url);
+  }
+
+  /**
+   * 本文とスタンプを、表示順に並んだ部品の配列にする。
+   * stamp.at（本文中の位置）があればその位置に、無ければ末尾に置く。
+   */
+  static #buildSegments(text, stamps) {
+    const placed = stamps
+      .map((s, i) => ({ s, i, at: Number.isFinite(s.at) ? Math.min(Math.max(s.at, 0), text.length) : text.length }))
+      .sort((a, b) => a.at - b.at || a.i - b.i);
+    const segs = [];
+    let pos = 0;
+    for (const { s, at } of placed) {
+      if (at > pos) segs.push({ text: text.slice(pos, at) });
+      segs.push({ stamp: s });
+      pos = Math.max(pos, at);
+    }
+    if (pos < text.length) segs.push({ text: text.slice(pos) });
+    return segs;
   }
 
   /**
@@ -81,7 +106,8 @@ export class CommentOverlay {
   /**
    * コメントをキューに追加する。
    * @param {string} text
-   * @param {{ color?: string, lane?: number, avatarUrl?: string|null, stamps?: Array<{url: string, fallbackText?: string}> }} opts
+   * @param {{ color?: string, lane?: number, avatarUrl?: string|null, stamps?: Array<{url: string, fallbackText?: string, at?: number}> }} opts
+   *   stamps[].at: 本文中でスタンプを描く位置（文字数）。省略時は末尾
    */
   addComment(text, { color = 'rgba(255,255,255,0.82)', lane = null, avatarUrl = null, stamps = [] } = {}) {
     if (this.#canvas.width === 0 || this.#canvas.height === 0) this.#syncSize();
@@ -97,7 +123,7 @@ export class CommentOverlay {
       x: this.#canvas.width,
       textWidth: null,
       avatarUrl,
-      stamps,
+      segments: CommentOverlay.#buildSegments(text ?? '', stamps),
     };
     this.#comments.push(comment);
     this.#lastInLane[chosenLane] = comment;
@@ -138,22 +164,15 @@ export class CommentOverlay {
     for (const c of this.#comments) {
       const y = c.lane * lh + Math.floor((lh - fs) / 2);
 
-      // スタンプ各項目の描画用データ（画像が読めていればアイコン、まだ/失敗ならフォールバックテキスト）を用意
-      const stampParts = c.stamps.map((s) => {
-        const img = this.#getImage(s.url);
-        if (img) return { img, width: av };
-        const fallback = s.fallbackText ?? '';
-        return { img: null, text: fallback, width: fallback ? ctx.measureText(fallback).width : 0 };
-      });
-
+      // 横幅を計算する。スタンプは画像の読み込み状態に関係なく常にアイコン1個分の幅で数える
+      // （読み込み中に長いショートカット文字を出して、届いた瞬間に縮む…という挙動を防ぐ）
       if (c.textWidth == null) {
-        const avatarPart = c.avatarUrl ? av + ag : 0;
-        const textPart   = ctx.measureText(c.text).width;
-        const stampsPart = stampParts.reduce((sum, p) => sum + p.width + ag, 0);
-        c.textWidth = avatarPart + textPart + stampsPart;
+        let w = c.avatarUrl ? av + ag : 0;
+        for (const seg of c.segments) {
+          w += seg.stamp ? av + ag : ctx.measureText(seg.text).width;
+        }
+        c.textWidth = w;
       }
-
-      let drawX = c.avatarUrl ? c.x + av + ag : c.x;
 
       // 丸アバター
       if (c.avatarUrl) {
@@ -168,32 +187,42 @@ export class CommentOverlay {
         }
       }
 
-      // 本文（縁取りで可読性を確保）
-      if (c.text) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-        ctx.lineWidth   = 3;
-        ctx.lineJoin    = 'round';
-        ctx.strokeText(c.text, drawX, y);
-
-        ctx.fillStyle = c.color;
-        ctx.fillText(c.text, drawX, y);
-        drawX += ctx.measureText(c.text).width;
-      }
-
-      // スタンプ（画像が読み込めていれば正方形アイコン、失敗時はテキストにフォールバック）
-      for (const part of stampParts) {
-        drawX += ag;
-        if (part.img) {
-          ctx.drawImage(part.img, drawX, y, av, av);
-        } else if (part.text) {
+      let drawX = c.avatarUrl ? c.x + av + ag : c.x;
+      for (const seg of c.segments) {
+        if (seg.stamp) {
+          // 本文中の元の位置にスタンプを描く（前後に少し隙間を空ける）
+          const sx  = drawX + ag / 2;
+          const img = this.#getImage(seg.stamp.url);
+          if (img) {
+            ctx.drawImage(img, sx, y, av, av);
+          } else if (this.#failedImages.has(seg.stamp.url)) {
+            // 画像が取れなかった場合は、枠内に収まる小さな印を出す（長い文字で幅が変わらないように）
+            ctx.save();
+            ctx.globalAlpha = 0.6;
+            ctx.fillStyle = c.color;
+            ctx.beginPath();
+            ctx.arc(sx + av / 2, y + av / 2, av / 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          } else {
+            // 読み込み中: 薄い枠だけ表示しておき、届いたらそのまま画像に置き換わる
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(sx + 0.5, y + 0.5, av - 1, av - 1);
+            ctx.restore();
+          }
+          drawX += av + ag;
+        } else if (seg.text) {
+          // 本文（縁取りで可読性を確保）
           ctx.strokeStyle = 'rgba(0,0,0,0.85)';
           ctx.lineWidth   = 3;
           ctx.lineJoin    = 'round';
-          ctx.strokeText(part.text, drawX, y);
+          ctx.strokeText(seg.text, drawX, y);
           ctx.fillStyle = c.color;
-          ctx.fillText(part.text, drawX, y);
+          ctx.fillText(seg.text, drawX, y);
+          drawX += ctx.measureText(seg.text).width;
         }
-        drawX += part.width;
       }
     }
   }
