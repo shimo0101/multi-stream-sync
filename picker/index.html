@@ -1369,27 +1369,34 @@
     }
 
     // まとめてフィード: 1チャンネル分バッファを補充
+    // 1チャンネルの失敗（アップロード無し・削除済みチャンネル等）でまとめて全体が止まらないよう、
+    // quota/キー無効以外のエラーはそのチャンネルを枯渇扱いにして続行する
     async function refillChannelBuffer(pc) {
       if (pc.exhausted) return;
-      const { items, nextToken } = await fetchChannelPageRaw(pc.channelId, pc.cursor);
-      pc.buffer.push(...items); // API から新しい順で返るのでそのまま追加でよい
-      pc.cursor = nextToken;
-      if (!nextToken) pc.exhausted = true;
+      try {
+        const { items, nextToken } = await fetchChannelPageRaw(pc.channelId, pc.cursor);
+        pc.buffer.push(...items); // API から新しい順で返るのでそのまま追加でよい
+        pc.cursor = nextToken;
+        if (!nextToken) pc.exhausted = true;
+      } catch (err) {
+        if (/quota|API キー/.test(err.message)) throw err;
+        console.warn('[まとめて] チャンネル取得失敗', pc.channelId, err);
+        pc.exhausted = true;
+        pc.failed    = true;
+      }
     }
 
     // 登録チャンネル群を「先頭同士を比較して一番新しいものから出す」k-way merge で合成
     async function extendMergedCache(cache, targetCount) {
+      // 各チャンネルのバッファをシード（正しい順序で比較するには全チャンネルの先頭が必要）。
+      // チャンネル数が多くても全件取得する（並列・1チャンネルあたり2ユニット程度）
+      await Promise.all(cache.perChannel
+        .filter(pc => !pc.buffer.length && !pc.exhausted)
+        .map(pc => refillChannelBuffer(pc)));
+
+      // シード後の追加補充だけを上限で制限する
       let fetches = 0;
-
-      // 各チャンネルのバッファをシード（比較のため、枯渇していない限り最低1件は必要）
-      for (const pc of cache.perChannel) {
-        if (!pc.buffer.length && !pc.exhausted && fetches < MAX_AUTO_FETCH_PAGES) {
-          await refillChannelBuffer(pc);
-          fetches++;
-        }
-      }
-
-      while (fetches < MAX_AUTO_FETCH_PAGES) {
+      while (true) {
         let candidate = null;
         for (const pc of cache.perChannel) {
           if (!pc.buffer.length) continue;
@@ -1397,18 +1404,25 @@
             candidate = pc;
           }
         }
-        if (!candidate) break; // 取得済みチャンネルが全て枯渇
+        if (!candidate) break; // 全チャンネルが枯渇
 
         cache.items.push(candidate.buffer.shift());
+        if (computeFilteredItems(cache).length >= targetCount) break;
         if (!candidate.buffer.length && !candidate.exhausted) {
+          // 補充しないと次の比較が正しくできないので、上限に達したらここで止める（「さらに読み込む」で続行）
+          if (fetches >= MAX_AUTO_FETCH_PAGES) break;
           await refillChannelBuffer(candidate);
           fetches++;
         }
-        if (computeFilteredItems(cache).length >= targetCount) break;
       }
 
       cache.exhausted = cache.perChannel.every(pc => pc.exhausted && !pc.buffer.length);
       cache.loadedAt  = Date.now();
+
+      const newlyFailed = cache.perChannel.filter(pc => pc.failed && !pc.failReported);
+      newlyFailed.forEach(pc => { pc.failReported = true; });
+      const failed = newlyFailed.length;
+      if (failed) showToast(`${failed} チャンネルの取得に失敗したため除外しました`, 'warn');
     }
 
     async function loadMergedCache() {
@@ -1586,6 +1600,7 @@
         const groupId = (activeYtGroup && activeYtGroup !== 'none') ? activeYtGroup : null;
         ytFavorites.push({ channelId, name: channelTitle, thumbnailUrl, groupId });
         saveFavorites();
+        clearAllMergedCaches(); // まとめてフィードのメンバー構成が変わるため
         renderChips();
         if (feedMode === 'all') renderResults(lastAllItems);
         showToast(`チャンネル "${channelTitle}" を登録しました`);
